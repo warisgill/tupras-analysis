@@ -2,10 +2,15 @@
 *.swp
 *.pyc
 *.xlsx
+*.xls
 .env/*
 
 
 .vscode/
 .dist/
 .ipynb_checkpoints/
+node_modules/
 
+
+old/
+storing-data-script/
