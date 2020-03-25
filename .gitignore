@@ -4,13 +4,14 @@
 *.xlsx
 *.xls
 .env/*
-
+*.csv
+*.csv#
 
 .vscode/
 .dist/
 .ipynb_checkpoints/
 node_modules/
 
-
+ISDB
 old/
 storing-data-script/
