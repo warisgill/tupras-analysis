@@ -4,10 +4,6 @@ import pandas as pd
 from datetime import timedelta
 from datetime import datetime
 from dateutil.parser import parse
-
-import matplotlib.pyplot as plt
-
-
 import plotly.io as pio
 pio.orca.config.use_xvfb = True
 pio.orca.config.executable = "/usr/local/bin/orca"
@@ -52,33 +48,45 @@ def maskSourceNames(df):
     df["SourceName"] = df["SourceName"].apply(lambda sname: change_source_names[sname])
     
     return change_source_names
-    
+
 def findChatterings(alarms, chattering_timedelta_threshold=60.0, chattering_count_threshold=3):
+    """Find the chatterings in an alarms list from the same source. 
+
+    Parameters
+    ----------
+    alarms  : list of dict
+        A list of alarms from the same source. 
+    chattering_timedelta_threshold : float, optional
+        Duration in seconds for which to finde cattering alarms, by default 60.0 seconds.
+    chattering_count_threshold : int, optional
+        Threshold for minimum number of alarms to be activated in duration of chattering_timedelta_threshold, by default 3
+    
+    Returns
+    ----------
+    chattering : dict
+        It contains the StartTime as key of chattering, and a dict as a value which is 
+        consits of an index and a count of of alarms chattered within chattering_timedelta_threshold next 
+        to it.  
+    """
+
     chattering = {}
-    
     alarms = [alarm for alarm in sorted(alarms, key=lambda arg: arg["StartTime"], reverse=False)]    
-    count = 0
-    total_chatters = 0
-    number_of_alarms = 0
-    
     i = 0
     j = 0
-    
+
     while i < (len(alarms)):
         t_prev = alarms[i]["StartTime"]
-        count = 0
+        count_alarms = 0
         j = i + 1 
         while j < len(alarms):
             t_next = alarms[j]["StartTime"]    
             if timedelta.total_seconds(t_next - t_prev) > chattering_timedelta_threshold:
-                break    
-            count += 1
+                break
+            count_alarms += 1
 #             print(time_delta, "count ++ ", count, t_prev, t_next)
             j +=1
         i = j
-        if count >= chattering_count_threshold:
-            chattering[t_prev] = {"own_index": i, "count": count}
-            total_chatters += 1
-            number_of_alarms += count
-            
-    return chattering, total_chatters, number_of_alarms
+        if count_alarms >= chattering_count_threshold:
+            chattering[t_prev] = {"index": i, "count": count_alarms}
+
+    return chattering
