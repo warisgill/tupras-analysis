@@ -90,3 +90,47 @@ def findChatterings(alarms, chattering_timedelta_threshold=60.0, chattering_coun
             chattering[t_prev] = {"index": i, "count": count_alarms}
 
     return chattering
+
+
+def convertRecordsToAlarms(records):
+    """ Convert records from the same source to proper alarms with start and end time.   
+
+        The record which contains "Recover" or "NR" in the Message column shows the deactivations. 
+
+    Parameters
+    ----------
+    records : list of dict
+        Each dict represent either activation of an alarm or deactivation of an alarm.  
+
+    Returns
+    -------
+    alarms : list of dict
+        Each dict in the list is an alarm with the StartTime and EndTime of an alarm. 
+    """
+
+
+    alarms = [] # conainsts alarms with start and end time. 
+    conditions_queues = {} # for enqueue and deque of records., Needed dictionary because there can be multiple types of alarms from the same source. 
+    alarm = None # dictionary 
+    records = [v for v in sorted(records, key=lambda arg: arg["EventTime"], reverse = False)]
+    for record in records:
+        
+        if conditions_queues.get(record["Condition"]) == None: # initiazlize the queue 
+            conditions_queues[record["Condition"]] = []
+
+        
+        if record["Message"].find("Recover") == -1 and record["Message"].find("NR") == -1: # Enqueue the record
+            conditions_queues[record["Condition"]].append(record) 
+        else: 
+            if len(conditions_queues[record["Condition"]])== 0:
+                continue
+
+            alarm = conditions_queues[record["Condition"]].pop(0) # Dqueue the record
+            alarm = {k:v for k,v in alarm.items()}
+            alarm["StartTime"] = alarm["EventTime"]
+            alarm["EndTime"] = record["EventTime"]
+            alarm["EndMessage"] = record["Message"]
+            del alarm["EventTime"]
+            alarms.append(alarm)
+
+    return alarms
