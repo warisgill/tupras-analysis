@@ -134,3 +134,29 @@ def convertRecordsToAlarms(records):
             alarms.append(alarm)
 
     return alarms
+
+def getChatteringAlarmsFromDataFrame(df):
+    """It uses convertRecordsToAlarms function to convert records of DF to alarms.
+
+    Parameters
+    ----------
+    df : pandas dataframe
+        
+
+    Returns
+    -------
+    chatters: list of tuple
+        Each tuple (SourceName,,) in the list is an alarm with the StartTime and EndTime of an alarm, found in whole df.
+    total_alarms_in_all_chatters: int
+        Total number of alarms in chatterings. 
+    """
+    
+    chatters = []
+    total_alarms_in_all_chatters = 0
+    for sname in df["SourceName"].unique():
+        s_alarms =  df.loc[df['SourceName'].isin([sname])]
+        s_alarms = s_alarms.to_dict(orient="records")
+        chats = findChatterings(s_alarms)
+        chatters.append((sname, len(chats.keys()), sum([d["count"] for d in chats.values()])))
+        total_alarms_in_all_chatters += sum([d["count"] for d in chats.values()]) 
+    return chatters, total_alarms_in_all_chatters
