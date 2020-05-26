@@ -5,8 +5,8 @@ from datetime import timedelta
 from datetime import datetime
 from dateutil.parser import parse
 import plotly.io as pio
-pio.orca.config.use_xvfb = True
-pio.orca.config.executable = "/usr/local/bin/orca"
+# pio.orca.config.use_xvfb = True
+pio.orca.config.executable = "/home/waris/anaconda3/envs/tupras/bin/orca"
 import plotly.express as px
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
@@ -49,50 +49,17 @@ def maskSourceNames(df):
     
     return change_source_names
 
-def findChatterings(alarms, chattering_timedelta_threshold=60.0, chattering_count_threshold=3):
-    """Find the chatterings in an alarms list from the same source. 
-
-    Parameters
-    ----------
-    alarms  : list of dict
-        A list of alarms from the same source. 
-    chattering_timedelta_threshold : float, optional
-        Duration in seconds for which to finde cattering alarms, by default 60.0 seconds.
-    chattering_count_threshold : int, optional
-        Threshold for minimum number of alarms to be activated in duration of chattering_timedelta_threshold, by default 3
+def getMessageType(message):
     
-    Returns
-    ----------
-    chattering : dict
-        It contains the StartTime as key of chattering, and a dict as a value which is 
-        consits of an index and a count of of alarms chattered within chattering_timedelta_threshold next 
-        to it.  
-    """
-
-    chattering = {}
-    alarms = [alarm for alarm in sorted(alarms, key=lambda arg: arg["StartTime"], reverse=False)]    
-    i = 0
-    j = 0
-
-    while i < (len(alarms)):
-        t_prev = alarms[i]["StartTime"]
-        count_alarms = 0
-        j = i + 1 
-        while j < len(alarms):
-            t_next = alarms[j]["StartTime"]    
-            if timedelta.total_seconds(t_next - t_prev) > chattering_timedelta_threshold:
-                break
-            count_alarms += 1
-#             print(time_delta, "count ++ ", count, t_prev, t_next)
-            j +=1
-        i = j
-        if count_alarms >= chattering_count_threshold:
-            chattering[t_prev] = {"index": i, "count": count_alarms}
-
-    return chattering
+    if message.find("Recover") != -1:
+        return "Recover"
+    elif message.find("NR") != -1:
+        return "NR"
+    else:
+        return "Activation"
 
 
-def convertRecordsToAlarms(records):
+def convertRecordsToAlarmsV2(records):
     """ Convert records from the same source to proper alarms with start and end time.   
 
         The record which contains "Recover" or "NR" in the Message column shows the deactivations. 
@@ -135,6 +102,105 @@ def convertRecordsToAlarms(records):
 
     return alarms
 
+
+def foo2 (df_start, df_end):
+    
+    alarms = []
+
+    start_records = [v for v in sorted(df_start.to_dict(orient="records"), key=lambda arg: arg["EventTime"], reverse = False)]
+    end_records = [v for v in sorted(df_end.to_dict(orient="records"), key=lambda arg: arg["EventTime"], reverse = False)] 
+
+    i = 0
+    j = 0
+
+    while i < len(start_records):
+        while j < len(end_records):
+            if start_records[i]["EventTime"] < end_records[j]["EventTime"]:
+                if i+1 < len(start_records) and start_records[i+1]["EventTime"] < end_records[j]["EventTime"]:
+                    break
+                alarm = {k:v for k,v in start_records[i].items()}
+                alarm["StartTime"] = alarm["EventTime"]
+                alarm["EndTime"] = end_records[j]["EventTime"]
+                alarm["EndMessage"] = end_records[j]["Message"]
+                del alarm["EventTime"]
+                alarms.append(alarm)
+                j += 1
+                break
+            j += 1
+
+        i += 1
+
+    return alarms  
+
+
+
+
+def convertRecordsToAlarmsV1(df_source):
+    alarms = []
+    for condition in df_source["Condition"].unique():
+        df_condition = df_source.loc[df_source['Condition'].isin([condition])]
+        df_start =  df_condition.loc[df_condition['MessageType'].isin(["Activation"])]
+        types = [type for type in df_condition["MessageType"].unique() if type!="Activation"] 
+        df_end  =  df_condition.loc[df_condition['MessageType'].isin(types)]
+        alarms += foo2(df_start,df_end)
+    
+    return alarms
+
+
+
+def findChatterings(alarms, chattering_timedelta_threshold=60.0, chattering_count_threshold=3):
+    """Find the chatterings in an alarms list from the same source. 
+
+    Parameters
+    ----------
+    alarms  : list of dict
+        A list of alarms from the same source. 
+    chattering_timedelta_threshold : float, optional
+        Duration in seconds for which to finde cattering alarms, by default 60.0 seconds.
+    chattering_count_threshold : int, optional
+        Threshold for minimum number of alarms to be activated in duration of chattering_timedelta_threshold, by default 3
+    
+    Returns
+    ----------
+    chattering : dict
+        It contains the StartTime as key of chattering, and a dict as a value which is 
+        consits of an index and a count of of alarms chattered within chattering_timedelta_threshold next 
+        to it.  
+    """
+
+    chattering = {}
+    alarms = [alarm for alarm in sorted(alarms, key=lambda arg: arg["StartTime"], reverse=False)]    
+    i = 0
+    j = 0
+
+    while i < (len(alarms)):
+        prev_start = alarms[i]["StartTime"]
+        prev_end = alarms[i]["EndTime"]
+        count_alarms = 0
+        j = i + 1 
+        while j < len(alarms):
+            next_start = alarms[j]["StartTime"]
+            next_end = alarms[j]["EndTime"]
+
+            # this assert is very important: the prev alarm has to turn off before the start of 
+            # the next one 
+            assert(prev_start < next_start)  
+            assert(prev_end <=next_start)
+            
+            delta =  timedelta.total_seconds(next_start - prev_start)
+            assert (delta >= 0)   
+            if  delta > chattering_timedelta_threshold:
+                break
+            count_alarms += 1
+#             print(time_delta, "count ++ ", count, t_prev, t_next)
+            j +=1
+        i = j
+        if count_alarms >= chattering_count_threshold:
+            chattering[prev_start] = {"index": i, "count": count_alarms}
+
+    return chattering
+
+
 def getChatteringAlarmsFromDataFrame(df):
     """It uses convertRecordsToAlarms function to convert records of DF to alarms.
 
@@ -154,9 +220,15 @@ def getChatteringAlarmsFromDataFrame(df):
     chatters = []
     total_alarms_in_all_chatters = 0
     for sname in df["SourceName"].unique():
-        s_alarms =  df.loc[df['SourceName'].isin([sname])]
-        s_alarms = s_alarms.to_dict(orient="records")
-        chats = findChatterings(s_alarms)
-        chatters.append((sname, len(chats.keys()), sum([d["count"] for d in chats.values()])))
-        total_alarms_in_all_chatters += sum([d["count"] for d in chats.values()]) 
+        df_source =  df.loc[df['SourceName'].isin([sname])]
+        v1 = sname
+        v2 = 0
+        v3 = 0
+        for condition in df_source["Condition"].unique():
+            df_condition = df_source.loc[df_source['Condition'].isin([condition])]
+            chats = findChatterings(df_condition.to_dict(orient="records"))
+            v2 += len(chats.keys()) # number of times it chatters
+            v3 += sum([d["count"] for d in chats.values()]) # total alarms in one chatter
+        chatters.append((v1, v2, v3))
+        total_alarms_in_all_chatters += v3 
     return chatters, total_alarms_in_all_chatters
