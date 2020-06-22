@@ -201,6 +201,7 @@ def findChatterings(alarms, chattering_timedelta_threshold=60.0, chattering_coun
             # the next one
             assert(prev_start <= next_start)
             assert(prev_end <= next_start)
+            assert(prev_end <= next_end)
 
             delta = timedelta.total_seconds(next_start - prev_start)
             assert (delta >= 0)
