@@ -183,8 +183,7 @@ def findChatterings(alarms, chattering_timedelta_threshold=60.0, chattering_coun
     """
 
     chattering = {}
-    alarms = [alarm for alarm in sorted(
-        alarms, key=lambda arg: arg["StartTime"], reverse=False)]
+    alarms = [alarm for alarm in sorted(alarms, key=lambda arg: arg["StartTime"], reverse=False)]
     i = 0
     j = 0
 
