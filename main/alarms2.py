@@ -1,7 +1,9 @@
 import networkx as nx
-from pyvis.network import Network
 from functools import partial
 from alarms import *
+
+
+
 
 # ================= Section 1: ================
 def removeShortDurationAlarms(df, duration_filters=[20,120]):
@@ -31,6 +33,10 @@ def removeShortDurationAlarms(df, duration_filters=[20,120]):
         title='Count',
         titlefont_size=16,
         tickfont_size=14,
+    ),xaxis=dict(
+        title='Month',
+        titlefont_size=16,
+        tickfont_size=14,
     ))
     fig.show()
     
@@ -55,138 +61,8 @@ def storageAnalysis(df,duration_filters=[20,120]):
     fig.show()
                
             
-# ================================= Section 2
 
-def checkAction_OnAlarm(action,alarm,filters):
-    if action["EventTime"] > alarm["StartTime"] and action["EventTime"] <= alarm["EndTime"] and timedelta.total_seconds(alarm["EndTime"]-action["EventTime"])<filters["gap"]:
-        return True
-    else:
-        return False
 
-def addOrUpdateEdge(g,e):
-    if g.has_edge(*e)==True:  
-        g.edges[e]["weight"] +=1
-    else:
-        g.add_edge(*e,weight=1)
-
-    return False 
-
-def addOrUpdateNode(g,color,operatorf,node):
-    if operatorf:
-        node = "Operator->"+ node
-    if g.has_node(node) == True:
-        g.nodes[node]["size"] += 0.01
-        g.nodes[node]["count"] += 1
-    else:
-        g.add_node(node,size=10,count=0,color=color)
-
-    return False 
-
-def constructSingleAlarmsActionsGraph(df_alarms,df_actions,alarms_nodes, action_nodes, filters): # case 3
-    g = nx.DiGraph() # Directed graph
-    
-    assert len(df_alarms["Month"].unique()) == len(df_actions["Month"].unique())
-    print(">> # of Alarms:{} and Operator Actions:{}".format(df_alarms.shape[0], df_actions.shape[0]))
-    
-    #---------- Adding Nodes----------------
-    _ = list(filter(partial(addOrUpdateNode,g,"Black",False), df_alarms["SourceName"]))         
-    _ = list(filter(partial(addOrUpdateNode,g,"Orange",True),df_actions["SourceName"]))
-
-    # converting rows to dicts
-    alarms_by_etime =df_alarms.to_dict(orient="records") #[alarm for alarm in sorted(df_alarms.to_dict(orient="records"), key=lambda arg: arg["EndTime"], reverse=False)]
-    actions_by_time =df_actions.to_dict(orient="records") # [action for action in sorted(df_actions.to_dict(orient="records"), key=lambda arg: arg["EventTime"], reverse=False)]
-    # -------- Adding Edges -----------------
-    edges = [("Operator->"+action["SourceName"],alarm["SourceName"]) for action in actions_by_time for alarm in alarms_by_etime if checkAction_OnAlarm(action,alarm,filters)]
-    _ = list(filter(partial(addOrUpdateEdge,g),edges)) 
-    
-    print(">> # of nodes = {}, # of edges = {}".format(g.number_of_nodes(),g.number_of_edges()))
-    return g
-
-def constructMultipleAlarmsActionsGraphs(df_alarms,df_actions,chunks,filters):
-    graphs = []
-    index_ranges = []
-    batch_size = df_alarms.shape[0]//chunks
-    alarm_nodes = df_alarms["SourceName"].unique()
-    action_nodes = df_actions["SourceName"].unique()
-    
-    ## Range Indexes
-    for start in range(0, df_alarms.shape[0], batch_size):    
-        if start+batch_size <= df_alarms.shape[0]: 
-            index_ranges.append((start,start+batch_size))
-    index_ranges[-1] = (index_ranges[-1][0],index_ranges[-1][1]+ 1 +(df_alarms.shape[0]%chunks))
-#     index_ranges.reverse()
-#     print(">> Chunks = {}, Index Ranges = {}".format(chunks,index_ranges))
-    
-    for t in index_ranges:
-        print("        ----------------------------------")        
-        df1 = df_alarms.iloc[t[0]:t[1],:]
-        df1.reset_index(drop=True, inplace=True)
-        min_date = df1["StartTime"].min()
-        max_date = df1["StartTime"].max()
-        print(">> Index Range = {}, Min & Max dates = {}".format(t, (min_date.date(),max_date.date())))
-        print(">> Filtering the Operator actions based on min-max dates ...")
-        df2 = df_actions[(df_actions["EventTime"]>=min_date) & (df_actions["EventTime"]<=max_date)]
-        df2.reset_index(drop=True, inplace=True)
-        g = constructSingleAlarmsActionsGraph(df1,df2,alarm_nodes,action_nodes,filters)
-        graphs.append(g)
-        
-    print("        ----------------------------------") 
-    return graphs
-
-def intersection_of_graphs(graphs,edge_filter=None):
-    common_g = nx.DiGraph()
-    
-    if edge_filter == None:
-        edge_filter = len(graphs)
-
-    edges = [edge for g in graphs for edge in g.edges]
-    edges_dict={edge:0 for edge in edges}
-    
-    for edge in edges:
-        edges_dict[edge] += 1
-
-    edges_dict = {k:v for k,v in edges_dict.items() if v>=edge_filter}
-
-    common_g.add_edges_from([(k[0],k[1],{"weight":0,"color":"Gray"}) for k in  edges_dict.keys()])
-    for g in graphs:
-        for e in common_g.edges:
-            if g.has_edge(*e) == True:
-                common_g.edges[e]["weight"] += g.edges[e]["weight"]
-
-    for n in common_g.nodes:
-        common_g.nodes[n]["count"] = 0 #g.nodes[n]["count"]
-        common_g.nodes[n]["size"] = 0 #g.nodes[n]["size"]
-
-    for g in graphs:
-        for n in common_g.nodes:
-            if g.has_node(n) == True:
-                common_g.nodes[n]["count"] += g.nodes[n]["count"]
-                common_g.nodes[n]["size"] += g.nodes[n]["size"]
-        
-    return common_g
-
-def getFinalOperatorAlarmRelationGraph(df_alarms,df_actions,chunks,min_intersectionf,monthsf,snamesf,durationf,gapf,weightf):   
-    print(">> Finding relation between operator action and alarm")
-    print(">> Number of sub graphs to be constructed :", chunks)
-    print(">> Filter: Only Include these months: ", monthsf)
-    print(">> Filter: Gap Filter for operator EventTime and alarm EndTime = {}s.".format(gapf))
-    print(">> Filter: Edges to be removed whose weight <= {}".format(weightf))
-    print(">> Filter: Ingore SourceNames ", snamesf)
-    
-    
-    df_filtered_alarms = df_alarms[(df_alarms["TimeDelta"]>durationf) & (df_alarms["Month"].isin(monthsf)) & (~df_alarms["SourceName"].isin(snamesf))]
-    df_filtered_actions = df_actions[df_actions["Month"].isin(monthsf)]
-    df_filtered_alarms = df_filtered_alarms.sort_values('StartTime')
-    df_filtered_actions =df_filtered_actions.sort_values('EventTime')
-
-    graphs = constructMultipleAlarmsActionsGraphs(df_filtered_alarms, df_filtered_actions,chunks,{"gap":gapf})
-    assert len(graphs)==chunks
-    print(">> Taking intersection of {} sub-graphs".format(len(graphs)))
-     
-    main_g = intersection_of_graphs(graphs,min_intersectionf)
-    temp_g = intersection_of_graphs(graphs,chunks)
-    
-    return main_g, temp_g
   
 # =========== Section 3: Finding Most important allarms
 
@@ -248,7 +124,6 @@ def getFinalAlarmRelationsGraph(df_alarms,chunks,min_intersectionf,monthsf,sname
     print(">> Filter: Gap Filter for prev to next alarm = {}s.".format(gapf))
     print(">> Filter: Ingore SourceNames ", snamesf)
     
-    df_filtered_alarms = df_alarms[(df_alarms["TimeDelta"]>durationf) & (df_alarms["Month"].isin(monthsf)) & (~df_alarms["SourceName"].isin(snamesf))]
     df_filtered_alarms = df_filtered_alarms.sort_values('StartTime')
     
 
@@ -257,9 +132,9 @@ def getFinalAlarmRelationsGraph(df_alarms,chunks,min_intersectionf,monthsf,sname
     print(">> Taking intersection of {} sub-graphs".format(len(graphs)))
      
     main_g = intersection_of_graphs(graphs,min_intersectionf)
-    temp_g = intersection_of_graphs(graphs,chunks)
+    # temp_g = intersection_of_graphs(graphs,chunks)
     
-    return main_g, temp_g
+    return main_g
 
 
 # =========== Section 3: Finding Most important allarms
