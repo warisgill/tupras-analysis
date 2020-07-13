@@ -2,7 +2,7 @@
 from datetime import timedelta
 import networkx as nx
 from functools import partial
-
+import plotly.graph_objects as go
 
 def preProcessAlarmData(df,months=None, sources_filter = [], monmentarly_filter=20, staling_filter=(60*60)*24):
     print(f">>Preprocessing... \n   Months to include={months}\n  Ignore Sources={sources_filter}\n  Ingnore Momentarlily Alarms Filter={monmentarly_filter}seconds \n   Ignoreing Staling Alarms Filter={staling_filter/3600.0} hours")
@@ -128,3 +128,49 @@ def getFinalAlarmRelationsGraph(df_alarms,num_sub_graphs,min_intersectionf,start
     main_g = intersection_of_graphs(graphs,min_intersectionf) 
     return main_g
 
+
+def plotAlarmsRelationsHeatMap(g, filter_weight):
+    print(f">> Removing edges whose weight is less than {filter_weight}")
+    remove_edges = []
+    for op, al, weight in g.edges.data("weight"):
+        if weight <=filter_weight:
+            remove_edges.append((op,al))
+    
+    # print(">> Edges Being Removed: ", remove_edges)
+    g.remove_edges_from(remove_edges)
+    print(f">> Nodes rmoved = {list(nx.isolates(g))} based on edge weighter filter = {filter_weight}")
+    g.remove_nodes_from(list(nx.isolates(g)))
+
+    # int2operator = dict(enumerate([action for action in g.nodes if action.find("Operator")!=-1]))
+    int2alarm = dict(enumerate([alarm for alarm in g.nodes if alarm.find("Operator")==-1]))
+
+    alarm2int = {v:k for k,v in int2alarm.items()}
+    # operator2int = {v:k for k,v in int2operator.items()}
+
+    # data2 = np.zeros((len(operator2int),len(alarm2int)))
+    data = [[None for i in range(len(alarm2int))] for j in range(len(alarm2int))]
+    print(">> Dimension",len(data[0]), len(data))
+
+
+    # print(f"After Removol: Alarm Tags = {len(alarm2int)} \n Operator Tags ={len(operator2int)} ")
+    
+    for s, d, weight in g.edges.data("weight"):
+        # print(op,al,weight)
+        data[alarm2int[s]][alarm2int[d]] = weight
+        # data2[operator2int[op],alarm2int[al]] = weight
+    
+
+    print(">> Y-axis is the source, X-axis is the target.")
+
+
+    fig = go.Figure(data=go.Heatmap(z=data,y = [int2alarm[v] for v in int2alarm.keys()],
+    x = [int2alarm[v] for v in int2alarm.keys()],
+    hoverongaps = False,
+    colorscale='Viridis',
+    labels = dict(x="Target",y="Source", color="# of times")
+    )) # Greys
+    
+    fig.update_layout(width=1000,height=1000,xaxis_nticks =150,yaxis_nticks =150)
+    fig.update_xaxes(side="top")
+    fig.show()
+    # return data

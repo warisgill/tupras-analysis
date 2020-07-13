@@ -1,12 +1,13 @@
 #%%
+
 import pandas as pd
 import networkx as nx
 from pyvis.network import Network
 from datetime import timedelta
 
-
 from helper_priority import preProcessAlarmData
 from helper_priority import getFinalAlarmRelationsGraph
+from helper_priority import plotAlarmsRelationsHeatMap
 
 #%%
 filter_short_alarms = [20, 120]  #seconds
@@ -28,14 +29,13 @@ df_main_alarms["Month"] = df_main_alarms["StartTime"].apply(lambda arg: arg.mont
 #%%
 
 months_f = df_main_alarms["Month"].unique()
-
 snames_f = ["47TI1713", "47TI931A"]
 
 # put month filter on operator data and then pass
 df_alarms_new = preProcessAlarmData(df_main_alarms,months=months_f,sources_filter=snames_f,monmentarly_filter=20,staling_filter=60*60*12)
 
 num_sub_graphs = 16
-min_intersection_f = 10
+min_intersection_f = 8
 main_g = getFinalAlarmRelationsGraph(df_alarms_new,num_sub_graphs,min_intersection_f, start_gap_next_alarmf= 60 *2 ,end_gap_next_alarmf= 60*60*4)
 print(f">> # of Edges Main graph {main_g.number_of_edges()}")
 print(">> Done")
@@ -104,3 +104,5 @@ nt.show("nt.html")
 
 
 # %%
+
+_ = plotAlarmsRelationsHeatMap(main_g,0)
