@@ -1,4 +1,5 @@
 #%%
+# from main.section-1-storage-analyis.storage-analyis import path
 import pandas as pd
 import networkx as nx
 from datetime import timedelta
@@ -11,18 +12,20 @@ from helper_operator_actions import plotOperatorAlarmRelationHeatMap
 #%%
 filter_short_alarms = [20, 120]  #seconds
 staling_alarms_filter = (60*60) * 12
-path = "../data/new/"
-
+PATH = "/home/waris/Github/tupras-analysis/data/"
+path_alarms = PATH + "processed/alarms/"
+path_op_actions = PATH + "processed/operator-actions/"
 
 #%%
 
 alarms_fname = "formatted-all-month-alarms.csv" 
 operator_fname = "operator-all-month-actions.csv"
-df_main_alarms = pd.read_csv(path + alarms_fname, low_memory=False ,parse_dates=["StartTime", "EndTime"])
+df_main_alarms = pd.read_csv(path_alarms + alarms_fname, low_memory=False ,parse_dates=["StartTime", "EndTime"])
 df_main_alarms["TimeDelta"] = df_main_alarms["EndTime"] - df_main_alarms["StartTime"]
 df_main_alarms["TimeDelta"] = df_main_alarms["TimeDelta"].apply(lambda arg: timedelta.total_seconds(arg)) 
 df_main_alarms["Month"] = df_main_alarms["StartTime"].apply(lambda arg: arg.month)
-df_main_actions = pd.read_csv(path + operator_fname, low_memory=False ,parse_dates=["EventTime"])
+
+df_main_actions = pd.read_csv(path_op_actions + operator_fname, low_memory=False ,parse_dates=["EventTime"])
 df_main_actions["Month"] = df_main_actions["EventTime"].apply(lambda arg: arg.month)
 
 
@@ -55,10 +58,8 @@ print(">> Done")
 # Verify the results based count with orignal csv da
 
 
-
 tg = nx.DiGraph(main_g)
 data = plotOperatorAlarmRelationHeatMap(g=tg.to_directed(),filter_weight =200) # returning for debugging
  
-
 
 # %%

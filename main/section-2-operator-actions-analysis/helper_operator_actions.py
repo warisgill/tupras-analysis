@@ -12,15 +12,43 @@ def preProcessAlarmData(df,months=None, sources_filter = [], monmentarly_filter=
     # assert df_new[(df_new["TimeDelta"]>monmentarly_filter)] 
     return df_new
 
+def intersection_of_graphs(graphs,edge_filter=None):
+    intersect_G = nx.DiGraph()
+    
+    if edge_filter is None:
+        edge_filter = len(graphs) # very important conditions
 
-# ================================= Section 2
+    assert edge_filter <= len(graphs)
+    assert edge_filter > 1 
+    
+    print(f">> Ingore the Edge if its not appearing in atleast {edge_filter}  graphs")
 
-# ignoring filter -> and timedelta.total_seconds(alarm["EndTime"]-action["EventTime"])<filters["gap"]
-def checkAction_OnAlarm(action,alarm):
-    if action["EventTime"] > alarm["StartTime"] and action["EventTime"] <= alarm["EndTime"] :
-        return True
-    else:
-        return False
+    edges = [edge for g in graphs for edge in g.edges]
+    edges_dict={edge:0 for edge in edges}
+    
+    for edge in edges:
+        edges_dict[edge] += 1
+
+    edges_dict = {k:v for k,v in edges_dict.items() if v>=edge_filter} # rmoving edeges which are not appearing in atleast "edge_filter" times.
+
+    intersect_G.add_edges_from([(k[0],k[1],{"weight":0}) for k in  edges_dict.keys()])
+    
+    for g in graphs:
+        for e in intersect_G.edges:
+            if g.has_edge(*e) == True:
+                intersect_G.edges[e]["weight"] += g.edges[e]["weight"]
+
+    for n in intersect_G.nodes:
+        intersect_G.nodes[n]["count"] = 0 #g.nodes[n]["count"]
+        intersect_G.nodes[n]["size"] = 0 #g.nodes[n]["size"]
+
+    for g in graphs:
+        for n in intersect_G.nodes:
+            if g.has_node(n) == True:
+                intersect_G.nodes[n]["count"] += g.nodes[n]["count"]
+                intersect_G.nodes[n]["size"] += g.nodes[n]["size"]
+        
+    return intersect_G
 
 def addOrUpdateEdge(g,e):
     if g.has_edge(*e)==True:  
@@ -40,6 +68,14 @@ def addOrUpdateNode(g,operatorf,node): # using partial thats why node as last ar
         g.add_node(node,size=10,count=0)
 
     return False 
+
+
+# ignoring filter -> and timedelta.total_seconds(alarm["EndTime"]-action["EventTime"])<filters["gap"]
+def checkAction_OnAlarm(action,alarm):
+    if action["EventTime"] > alarm["StartTime"] and action["EventTime"] <= alarm["EndTime"] :
+        return True
+    else:
+        return False
 
 def constructSingleAlarmsActionsGraph(df_alarms,df_actions): # case 3
     g = nx.DiGraph() # Directed graph
@@ -96,43 +132,7 @@ def constructMultipleAlarmsActionsGraphs(df_alarms,df_actions,chunks):
     print("        ----------------------------------") 
     return graphs
 
-def intersection_of_graphs(graphs,edge_filter=None):
-    intersect_G = nx.DiGraph()
-    
-    if edge_filter is None:
-        edge_filter = len(graphs) # very important conditions
 
-    assert edge_filter <= len(graphs)
-    assert edge_filter > 1 
-    
-    print(f">> Ingore the Edge if its not appearing in atleast {edge_filter}  graphs")
-
-    edges = [edge for g in graphs for edge in g.edges]
-    edges_dict={edge:0 for edge in edges}
-    
-    for edge in edges:
-        edges_dict[edge] += 1
-
-    edges_dict = {k:v for k,v in edges_dict.items() if v>=edge_filter} # rmoving edeges which are not appearing in atleast "edge_filter" times.
-
-    intersect_G.add_edges_from([(k[0],k[1],{"weight":0}) for k in  edges_dict.keys()])
-    
-    for g in graphs:
-        for e in intersect_G.edges:
-            if g.has_edge(*e) == True:
-                intersect_G.edges[e]["weight"] += g.edges[e]["weight"]
-
-    for n in intersect_G.nodes:
-        intersect_G.nodes[n]["count"] = 0 #g.nodes[n]["count"]
-        intersect_G.nodes[n]["size"] = 0 #g.nodes[n]["size"]
-
-    for g in graphs:
-        for n in intersect_G.nodes:
-            if g.has_node(n) == True:
-                intersect_G.nodes[n]["count"] += g.nodes[n]["count"]
-                intersect_G.nodes[n]["size"] += g.nodes[n]["size"]
-        
-    return intersect_G
 
 def getFinalOperatorAlarmRelationGraph(df_alarms,df_actions,num_graphs, min_graphs_intersection_filter):   
     print(">> Finding relation between operator action and alarm")
@@ -152,7 +152,6 @@ def getFinalOperatorAlarmRelationGraph(df_alarms,df_actions,num_graphs, min_grap
     return main_g
 
 def plotOperatorAlarmRelationHeatMap(g, filter_weight):
-      
     remove_edges = []
     for op, al, weight in g.edges.data("weight"):
         if weight <=filter_weight:
