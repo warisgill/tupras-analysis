@@ -139,7 +139,7 @@ def constructMultipleAlarmsActionsGraphs(df_alarms, df_actions, chunks):
         # df1.reset_index(drop=True, inplace=True)
 
         min_date = df1["StartTime"].min()
-        max_date = df1["EndTime"].max()
+        max_date = df1["StartTime"].max()
         print(
             f">> Index Range = {t}, Min Date ={min_date.date()} & Max date = {max_date.date()}")
         print(">> Filtering the Operator actions based on min-max dates ...")
@@ -174,6 +174,32 @@ def getFinalOperatorAlarmRelationGraph(df_alarms, df_actions, num_graphs, min_gr
     main_g = intersection_of_graphs(graphs, min_graphs_intersection_filter)
 
     return main_g
+
+def filterEdges(g, edge_drop_factor):
+    g = nx.DiGraph(g)
+    remove_edges = []
+    for source, target, weight in g.edges.data("weight"):
+        if edge_drop_factor * weight < g.nodes[target]["count"]:
+            remove_edges.append((source, target))
+
+    g.remove_edges_from(remove_edges)
+    g.remove_nodes_from(list(nx.isolates(g)))
+    return g
+
+def getSourceNamesWhichRequiredActionAndNot(df, g):
+    source_names_requried_action = [
+        source for source in g.nodes if source.find("Operator") == -1]
+    df_temp = df[~df["SourceName"].isin(source_names_requried_action)]
+    sources_not_require_action = df_temp["SourceName"].unique()
+    return source_names_requried_action, sources_not_require_action
+
+def getTrueAndNuisanceSourceNames(df_alarms,df_operator, num_sub_graphs = 8,edge_filter = 8):
+    
+    min_intersection_f = num_sub_graphs//2 + 1
+    
+    sources_need_action, sources_dont_need_action = getSourceNamesWhichRequiredActionAndNot(df_alarms, g=filterEdges(getFinalOperatorAlarmRelationGraph(df_alarms=df_alarms, df_actions=df_operator,
+                                                num_graphs=num_sub_graphs, min_graphs_intersection_filter=min_intersection_f), edge_drop_factor=edge_filter))
+    return sources_need_action, sources_dont_need_action
 
 
 def plotOperatorAlarmRelationHeatMap(g):

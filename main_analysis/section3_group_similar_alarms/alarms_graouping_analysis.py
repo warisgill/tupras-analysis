@@ -1,4 +1,5 @@
 # %%
+
 import time
 from networkx.algorithms import components
 from networkx.algorithms.centrality import group
@@ -8,15 +9,19 @@ from pyvis.network import Network
 from datetime import timedelta
 import plotly.express as px
 
-from helper_grouping import *
+from section3_group_similar_alarms.helper_grouping import analyzeAlarmdata, getTimeDelta, concatenateSourceNameAndCondition, plotSourceAndCondtionHistogram, preProcessAlarmData
+from section2_operator_actions.helper_operator_actions import getTrueAndNuisanceSourceNames
 
 
 # %%
 PATH = "/home/waris/Github/tupras-analysis/data/"
 path_alarms = PATH + "processed/alarms/"
+path_op_actions = PATH + "processed/operator-actions/"
 
 start = time.time()
 alarms_fname = "formatted-all-month-alarms.csv"
+operator_fname = "operator-all-month-actions.csv"
+
 df_main_alarms = pd.read_csv(path_alarms + alarms_fname,
                              low_memory=False, parse_dates=["StartTime", "EndTime"])
 
@@ -24,8 +29,14 @@ df_main_alarms["TimeDelta"] = df_main_alarms[["StartTime","EndTime"]].apply(lamb
 df_main_alarms["Month"] = df_main_alarms["StartTime"].apply(lambda arg: arg.month)
 df_main_alarms["SourceName"] = df_main_alarms[["SourceName", "Condition"]].apply(lambda arg: concatenateSourceNameAndCondition(*arg),axis =1)
 
+df_main_actions = pd.read_csv(
+    path_op_actions + operator_fname, low_memory=False, parse_dates=["EventTime"])
+df_main_actions["Month"] = df_main_actions["EventTime"].apply(
+    lambda arg: arg.month)
+
 print("End time ", time.time()-start)
 df_main_alarms
+
 
 #%%
 
@@ -59,10 +70,23 @@ df_alarms_new2 = preProcessAlarmData(df_main_alarms, months=months_f, sources_fi
                                      monmentarly_filter=fleeting_alarms_filter, staling_filter=staling_alarms_filter, ingore_communication_alarms=True, min_alarms_per_source=20)
 
 
+
 plotSourceAndCondtionHistogram(df_alarms_new1) # with comm alarms
 plotSourceAndCondtionHistogram(df_alarms_new2) # without comm alarms
 df_alarms_new = df_alarms_new2  # analyzing alarms without communicationa alarms
 source2count = dict(df_alarms_new["SourceName"].value_counts())
+
+#%% 
+"""
+    Only grouping nuisance alarms
+"""
+true_sources, nuisance_sources= getTrueAndNuisanceSourceNames(df_alarms=df_alarms_new,df_operator=df_main_actions)
+
+print(">> Before Filtering of True Alarms", df_alarms_new.shape[0])
+
+df_alarms_new = df_alarms_new[df_alarms_new["SourceName"].isin(nuisance_sources)] # only analyze the nusiance alrms
+
+print(">> After Filtering of True Alarms", df_alarms_new.shape[0])
 
 # %%
 """Grouping of Source Names"""
@@ -116,11 +140,20 @@ print(">> Useless",useless_snames)
 
 num_useless_alarms = sum([t[1] for t in useless_snames])
 
-x_axis = ["Without Grouping", "Grouping"]
+x_axis = ["Raw Nuisance Alarms", "Nuisance Alarms with Grouping"]
 y_axis = [total_alarms, total_alarms-num_useless_alarms]
 
 fig =px.bar(x=x_axis, y=y_axis)
+fig.update_layout(yaxis=dict(title="# of alarms",
+    titlefont_size=16,
+    tickfont_size=14,
+), xaxis=dict(
+    title='',
+    titlefont_size=16,
+    tickfont_size=14,
+))
 fig.show()
+
     
 
 # %%
@@ -160,13 +193,6 @@ fig.show()
 # # nt.toggle_physics(False)
 # nt.show("nt.html")
 
-
-# %%
-
-
-# for n1 in main_g.nodes:
-#     for n2 in main_g.nodes:
-#         print(list(nx.common_neighbors(main_g.to_undirected(),n1,n2)))
 
 
 # %%
