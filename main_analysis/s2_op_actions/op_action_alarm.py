@@ -1,7 +1,7 @@
 
 # %%
 from typing import Final
-from helpers.ploting import plotBargraph
+from helpers.ploting import plotBargraph, plotSubBarGraphs
 from helpers.graphs import filterEdges
 from helpers.operator_actions import __getTrueAndNuisanceSources, __getFinalOperatorAlarmRelationGraph, getTrueAndNuisanceSourceNames
 from helpers.alarms import  filterAlarmData, getDFWithCommonSourcesInAllMonths, loadAlarmsData, loadOperatorData
@@ -93,19 +93,16 @@ total_number_of_alarms = df_alarms_new.shape[0]
 number_of_alarms_not_have_action = df_alarms_new[df_alarms_new["SourceName"].isin(
     nuisance_sources)].shape[0]
 
-x_axis = ["Raw Alarms", "True Alarms", "Nuisance Alarms"]
-y_axis = [total_number_of_alarms, total_number_of_alarms -
+x_axis1 = ["Raw Alarms", "True Alarms", "Nuisance Alarms"]
+y_axis1 = [total_number_of_alarms, total_number_of_alarms -
           number_of_alarms_not_have_action, number_of_alarms_not_have_action]
 
-plotBargraph(x_axis=x_axis,y_axis=y_axis, xtitle="", ytitle="# of alarms") # for debugging purposes
-
-
-x_axis = ["True Alarms", "Nuisance Alarms"]
-y_axis = [((total_number_of_alarms-number_of_alarms_not_have_action)/total_number_of_alarms)
+x_axis2 = ["True Alarms", "Nuisance Alarms"]
+y_axis2 = [((total_number_of_alarms-number_of_alarms_not_have_action)/total_number_of_alarms)
           * 100, (number_of_alarms_not_have_action/total_number_of_alarms)*100]
 
-plotBargraph(x_axis=x_axis,y_axis=y_axis, xtitle="", ytitle="% of alarms") # to put in the paper
 
+plotSubBarGraphs(x_axis1,y_axis1,x_axis2,y_axis2)
 
 # %%
 

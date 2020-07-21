@@ -3,8 +3,6 @@ from helpers.group_alarms import analyzeAlarmdata
 from helpers.ploting import plotBargraph, plotSourceAndCondtionHistogram
 from helpers.alarms import filterAlarmData, loadAlarmsData, loadOperatorData
 from helpers import operator_actions as operator
-
-
 import time
 
 
@@ -103,10 +101,7 @@ while edge_drop_factor < max_edge_drop_factor:
 plotSourceAndCondtionHistogram(df_alarms_new) # to visualize which sourcenames are grouped
 
 #%%
-""" 
-    How many Nuisance alarms will be reduced if we do grouping? 
-"""
-
+""" How many Nuisance alarms will be reduced if we do grouping? """
 
 main_sources =[name for name in df_alarms_new["SourceName"].unique() if name.find("=>") ==-1]
 
@@ -127,7 +122,7 @@ print(">> Useless",useless_snames)
 
 num_useless_alarms = sum([t[1] for t in useless_snames])
 
-x_axis = ["Raw Nuisance Alarms", "Nuisance Alarms with Grouping"]
+x_axis = ["Overall Nuisance Alarms", "Nuisance Alarms with Grouping"]
 y_axis = [total_alarms, total_alarms-num_useless_alarms]
 
 

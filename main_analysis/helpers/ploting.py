@@ -1,3 +1,4 @@
+from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
@@ -73,13 +74,49 @@ def plotAlarmsRelationsHeatMap(g):
     fig.show()
     return data
 
-# %%
-""" 
-    For Visualization
-"""
+#%% 
 
-""" Vis Netowrk """
+"""Currently using these graphs """ 
+def plotSourceAndCondtionHistogram(df):
+    fig = px.histogram(df, x="SourceName", color='Condition')
+    fig.show()
 
+def plotBargraph(x_axis, y_axis, xtitle="", ytitle="", range_y=None):
+    
+    trace = go.Bar(x=x_axis,y=y_axis, text=y_axis, textposition="auto")
+    
+    fig = go.Figure(data=trace) 
+    
+    # updating the figure properties
+    fig.update_xaxes(title_text=xtitle)
+    if range_y is not None:
+        fig.update_yaxes(title_text=ytitle, range=range_y)
+    else:
+        fig.update_yaxes(title_text=ytitle)
+
+    fig.show()
+
+def plotSubBarGraphs(x_axis1, y_axis1,x_axis2,y_axis2):
+
+    trace1 = go.Bar(x=x_axis1, y=y_axis1,text=y_axis1, textposition='auto')
+    trace2 = go.Bar(x=x_axis2, y=y_axis2,text=[f"{num:.2f}" for num in y_axis2], textposition='auto', marker_color='rgb(55, 83, 109)') 
+
+    fig = make_subplots(rows=1, cols=2, subplot_titles=("Plot a", "Plot b"),column_widths=[0.6, 0.4])
+    
+    fig.add_trace(trace1,row=1, col=1 )
+    fig.add_trace(trace2,row=1, col=2)
+
+    # Updating figure properties
+    fig.update_xaxes(title_text="", row=1, col=1)
+    fig.update_xaxes(title_text="", row=1, col=2)
+    fig.update_yaxes(title_text="# of Alarms", row=1, col=1)
+    fig.update_yaxes(title_text="% of Alarms", range=[0, 100], row=1, col=2)
+
+    fig.update_layout(showlegend=False, height=600, width=1100)
+    fig.show()
+
+
+""" For Visualization"""
 
 # for edge in graph.edges:
 #     # graph.edges[edge]["value"] = graph.edges[edge]["weight"]
@@ -113,22 +150,3 @@ def plotAlarmsRelationsHeatMap(g):
 
 
 
-
-#%% 
-
-"""Currently using these graphs """ 
-def plotSourceAndCondtionHistogram(df):
-    fig = px.histogram(df, x="SourceName", color='Condition')
-    fig.show()
-
-def plotBargraph(x_axis, y_axis, xtitle="", ytitle=""):
-    fig = px.bar(x=x_axis, y=y_axis)
-    fig.update_layout(yaxis=dict(title=ytitle,
-        titlefont_size=16,
-        tickfont_size=14,
-    ), xaxis=dict(
-        title=xtitle,
-        titlefont_size=16,
-        tickfont_size=14,
-    ))
-    fig.show()
