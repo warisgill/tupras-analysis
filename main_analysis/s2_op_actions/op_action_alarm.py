@@ -10,25 +10,23 @@ import time
 # %%
 """  Lodading the Data and Preprocessing """
 PATH = "/home/waris/Github/tupras-analysis/data/"
-path_alarms = PATH + "processed/alarms/"
-path_op_actions = PATH + "processed/operator-actions/"
+alarm_file_path = PATH + "processed/alarms/final/final-all-months-alarms.csv"
+op_action_file_path = PATH + "processed/operator-actions/final/final-all-month-actions.csv"
 
 start = time.time()
-alarms_fname = "formatted-all-month-alarms.csv"
-operator_fname = "operator-all-month-actions.csv"
 
-df_main_alarms =loadAlarmsData(path=path_alarms,filename=alarms_fname,preprocess=True)
-df_main_actions = loadOperatorData(path=path_op_actions,filename=operator_fname,preprocess=True)
+df_main_alarms =loadAlarmsData(file_path=alarm_file_path)
+df_main_actions = loadOperatorData(file_path=op_action_file_path)
 
 """ Common Sources in all months. Try it but can be skipped. """
 # df_main_alarms = getDFWithCommonSourcesInAllMonths(df_main_alarms)
-
 
 """ Chaning name 2 alias for alarm data but skipping it """
 # source2Alias, alias2source = convertSourceNamesToAlias(df_main_alarms)
 
 print("Total Time to load the data ", time.time()-start)
 df_main_alarms
+df_main_alarms.info()
 
 # %%
 
@@ -45,28 +43,29 @@ ignore_comm_alarms :Final = True
 momentary_alarms_f:Final = 20  # seconds
 staling_alarm_f:Final = (60*60) * 12 # hours
 min_alarms_per_source_f:Final = 20 # any source which is not triggered atleast 20 times in whole dataset will be removed
-months_f:Final = df_main_alarms["Month"].unique()
+months_f:Final = df_main_alarms["Year-Month"].unique()
+print(f">> Unique Year-Month {months_f}")
 snames_f:Final = [] # ONLY USE IF NOT IGNORING COMM ALRMS
 
 df_alarms_new = filterAlarmData(df_main_alarms, months=months_f, sources_filter=snames_f,
                                      monmentarly_filter=momentary_alarms_f, staling_filter=staling_alarm_f, ingore_communication_alarms=ignore_comm_alarms, min_alarms_per_source=min_alarms_per_source_f)
 
 
-df_actions_new = df_main_actions[df_main_actions["Month"].isin(months_f)]
+df_actions_new = df_main_actions[df_main_actions["Year-Month"].isin(months_f)]
 df_alarms_new
 
 #%%
 """ 
     For Opertartor Graphs
-    1. Construct 4 sub-graphs
+    1. Construct sub-graphs equal to number of months
     2. Min intersections is sub-graphs/2 + 1
     3. Remove edges which are not significantaly contributing to nodes count
         It will vary in op actions and in grouping. In op actions
         it will be higher but in groupign it will be lower.
 """
-num_sub_graphs:Final = 4
+num_sub_graphs:Final = len(months_f)
 min_intersection_f:Final = num_sub_graphs//2 + 1
-edge_filter:Final = 4 # BE CAREFUL OVER HERE
+edge_filter:Final = 3 # BE CAREFUL OVER HERE
 
 
 temp_g = __getFinalOperatorAlarmRelationGraph(df_alarms=df_alarms_new, df_actions=df_actions_new,

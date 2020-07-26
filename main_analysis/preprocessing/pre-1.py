@@ -1,18 +1,17 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
 # %%
 import json
 import pandas as pd
 from datetime import datetime
 from dateutil.parser import parse
 from pathlib import Path
+import glob
 
 
 # %%
-def changeDate(d):
-        d = d.replace(".000000000","")
-        d = d.replace("/","-")
-        return parse(d)
+msg_filter = " ACK" # to filter Ack messages
+path = "/home/waris/Github/tupras-analysis/data/"
+path_raw = path+"raw/alarms/"  
+path_prcessed = path+"processed/alarms/"
 
 def getMessageType(message):
     if message.find("Recover") != -1:
@@ -22,21 +21,47 @@ def getMessageType(message):
     else:
         return "Activation"
 
-# %%
-msg_filter = " ACK" # to filter Ack messages
-path = "/home/waris/Github/tupras-analysis/data/"
-path_raw = path+"raw/alarms/"  
-path_prcessed = path+"processed/alarms/"
-
-
 #%%
-for f in ["haziran2019.csv","march2019.csv","mayis2019.csv","nisan2019.csv"]:    
+
+for p in glob.glob(path_raw+"*.csv"):        
+        
+    print("============== File Name:{} =================".format(p.split("/")[-1]))
     
-    print("============== File Name:{} =================".format(f))
-    input_file_name = f
-    output_flie_name = "formatted-pre-1-"+ input_file_name
-    print(">> Debug",path_raw+input_file_name)
-    df = pd.read_csv(path_raw+input_file_name, delimiter= ";" ,encoding = "ISO-8859-1")    
+    df = pd.read_csv(p, delimiter= ";" ,encoding = "ISO-8859-1")
+    df.columns = [''.join(e for e in col if e.isalnum()) for col in df.columns]
+    df.columns = [col.replace("ï","") for col in df.columns]    
+    
+    print("Column  Type")
+    for col in df.columns:
+        print(col, type(df[col][0]))
+        if isinstance(df[col][0],str):
+            try:
+                df[col] = df[col].apply(lambda s:" ".join(s.split()) )
+            except:
+                print(">> Error =============== String spliting opertion is not applied on ", col)
+
+    print(type(df["EventTime"][0]))
+    
+    df["EventTime"] = df["EventTime"].apply(lambda d: d.replace(".000000000","").replace("/","-"))
+    df["MessageType"] = df["Message"].apply(getMessageType)
+    df2 = df.loc[df['Message'].map(lambda arg: arg.find(msg_filter)) == -1]  
+    print(f">> Difference after filtering the acks: Before {df.shape} After={df2.shape}")
+    df = df2
+    output_flie_name = "f-pre-1-"+ p.split("/")[-1]
+    df.to_csv(path_prcessed+output_flie_name, index=False)
+    del df
+    del df2
+
+
+print("\n\n>> Reading newer receive files.")
+
+for p in glob.glob(path_raw+"new/*.csv"):    
+    print("============== File Name:{} =================".format(p.split("/")[-1]))
+    
+
+    df = pd.read_csv(p, delimiter= "," ,encoding = "ISO-8859-1")
+    df.columns = [''.join(e for e in col if e.isalnum()) for col in df.columns]
+    df.columns = [col.replace("ï","") for col in df.columns]    
 
     print("Column  Type")
     for col in df.columns:
@@ -46,35 +71,70 @@ for f in ["haziran2019.csv","march2019.csv","mayis2019.csv","nisan2019.csv"]:
 
     print(type(df["EventTime"][0]))
 
-    
-    df["EventTime"] = df["EventTime"].apply(changeDate)
+    df["EventTime"] = df["EventTime"].apply(lambda d: d.replace(".000000000","").replace("/","-"))
     df["MessageType"] = df["Message"].apply(getMessageType)
     df2 = df.loc[df['Message'].map(lambda arg: arg.find(msg_filter)) == -1] # df_temp[~df_temp["Message"].str.contains(msg_filter,case=True)] # filtering Ack messages. 
-    print(df.shape,df2.shape)
+    print(f">> Difference after filtering the acks: Before {df.shape} After={df2.shape}")
     df = df2
+    output_flie_name = "f-pre-1-"+ p.split("/")[-1]
     df.to_csv(path_prcessed+output_flie_name, index=False)
-    print(df.shape,df2.shape)
-print("========================= Complete =====================")
+    del df2
+    del df
+    
+print("========================= Complete Alarms Processing =====================")
 
-# %% [markdown]
-# # Preprocessing of Operator Data
+
 
 # %%
-files_operator = ["MarchOperation_v2.xls","AprilOperation_v2.xls","MayOperation_v2.xls","JuneOperation_v2.xls"]
+# df = pd.read_csv(path_raw+"new/2020_01.csv", delimiter= "," ,encoding = "ISO-8859-1")
+# df
+# %%
+
 path_raw = path+"raw/operator-actions/"
 path_prcessed = path+"processed/operator-actions/"
-for f in files_operator:
-    output_flie_name = "operator-pre-1-"+ f.split(".")[0]+".csv"
-    print("==================== File : {} =============".format(f))
-    cols = ["MachineName","SourceName","EventTime","Message","Severity","Mask","NewState","EventType","EventCategory","AckReq","ActorID","Area","Attributes"]
-    df_excel_operator = pd.read_excel(path_raw+f,usecols=cols)
+for p in glob.glob(path_raw+"*.xls"):
+    output_flie_name = "op-pre-1-"+ p.split("/")[-1]
+    output_flie_name = output_flie_name.split(".")[0]+".csv" 
+    print("==================== File : {} =============".format(p.split("/")[-1]))
+    df_excel_operator = pd.read_excel(p)
+    df_excel_operator.columns = [''.join(e for e in col if e.isalnum()) for col in df_excel_operator.columns]
+    df_excel_operator.columns = [col.replace("ï","") for col in df_excel_operator.columns]
 
     for col in df_excel_operator.columns:
+        print(col, type(df_excel_operator[col][0]))
         if isinstance(df_excel_operator[col][0],str):
             df_excel_operator[col] = df_excel_operator[col].apply(lambda s: " ".join(s.split()))
 
-    df_excel_operator["EventTime"] = df_excel_operator["EventTime"].apply(changeDate)
+    df_excel_operator["EventTime"] = df_excel_operator["EventTime"].apply(lambda d: d.replace(".000000000","").replace("/","-"))
     df_excel_operator.to_csv(path_prcessed+output_flie_name, index=False)
+    del df_excel_operator
+
+
+print(">> =========== Processing Op new data")
+
+path_raw = path+"raw/operator-actions/"
+path_prcessed = path+"processed/operator-actions/"
+for p in glob.glob(path_raw+"new/*.xls"):
+    output_flie_name = "op-pre-1-"+ p.split("/")[-1]
+    output_flie_name = output_flie_name.split(".")[0]+".csv"
+
+    print("==================== File : {} =============".format(p.split("/")[-1]))
+    df_excel_operator = pd.read_excel(p)
+    df_excel_operator.columns = [''.join(e for e in col if e.isalnum()) for col in df_excel_operator.columns]
+    df_excel_operator.columns = [col.replace("ï","") for col in df_excel_operator.columns]
+
+    for col in df_excel_operator.columns:
+        print(col, type(df_excel_operator[col][0]))
+        if isinstance(df_excel_operator[col][0],str):
+            df_excel_operator[col] = df_excel_operator[col].apply(lambda s: " ".join(s.split()))
+
+    df_excel_operator["EventTime"] = df_excel_operator["EventTime"].apply(lambda d: d.replace(".000000000","").replace("/","-"))
+    df_excel_operator.to_csv(path_prcessed+output_flie_name, index=False)
+    del df_excel_operator
+
+
+
+print("> ------------ Operator Data Processing pre1 is complete. ")
 
 
 # %%

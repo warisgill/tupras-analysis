@@ -10,15 +10,13 @@ import time
 
 """  Lodading the Data and Preprocessing """
 PATH = "/home/waris/Github/tupras-analysis/data/"
-path_alarms = PATH + "processed/alarms/"
-path_op_actions = PATH + "processed/operator-actions/"
+alarm_file_path = PATH + "processed/alarms/final/final-all-months-alarms.csv"
+op_action_file_path = PATH + "processed/operator-actions/final/final-all-month-actions.csv"
 
 start = time.time()
-alarms_fname = "formatted-all-month-alarms.csv"
-operator_fname = "operator-all-month-actions.csv"
 
-df_main_alarms =loadAlarmsData(path=path_alarms,filename=alarms_fname,preprocess=True)
-df_main_actions = loadOperatorData(path=path_op_actions,filename=operator_fname,preprocess=True)
+df_main_alarms =loadAlarmsData(file_path=alarm_file_path)
+df_main_actions = loadOperatorData(file_path=op_action_file_path)
 
 """ Common Sources in all months. Try it but can be skipped. """
 # df_main_alarms = getDFWithCommonSourcesInAllMonths(df_main_alarms)
@@ -43,7 +41,7 @@ ignore_comm_alarms = True
 momentary_alarms_f = 20  # seconds
 staling_alarm_f = (60*60) * 12 # hours
 min_alarms_per_source_f = 20 # any source which is not triggered atleast 20 times in whole dataset will be removed
-months_f = df_main_alarms["Month"].unique()
+months_f = df_main_alarms["Year-Month"].unique()
 snames_f = [] # ONLY USE IF NOT IGNORING COMM ALRMS
 
 df_alarms_new = filterAlarmData(df_main_alarms, months=months_f, sources_filter=snames_f,
@@ -64,7 +62,7 @@ plotSourceAndCondtionHistogram(df_alarms_new) # with comm alarms
         it will be higher but in groupign it will be lower.
 """
 
-true_sources, nuisance_sources= operator.getTrueAndNuisanceSourceNames(df_alarms=df_alarms_new,df_operator=df_main_actions,num_sub_graphs=4,min_intersection_f=4//2+1,edge_filter=4)
+true_sources, nuisance_sources= operator.getTrueAndNuisanceSourceNames(df_alarms=df_alarms_new,df_operator=df_main_actions,num_sub_graphs=len(months_f),min_intersection_f=(len(months_f)//2)+1,edge_filter=3)
 
 print(f">> True Sources ({len(true_sources)}) = {true_sources} \n\n>> Nuisance Sources ({len(nuisance_sources)}) = {nuisance_sources}")
 

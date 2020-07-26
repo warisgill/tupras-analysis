@@ -1,24 +1,16 @@
 from datetime import timedelta
 from pandas import read_csv
+import vaex
 
 # %%
 
-def loadAlarmsData(path, filename, preprocess=True):
-    df = read_csv(path + filename, low_memory=False,
+def loadAlarmsData(file_path):
+    df = read_csv(file_path, low_memory=False,
                   parse_dates=["StartTime", "EndTime"])
-
-    if preprocess == True:
-        addTimeDeltaToDataFrame(df)
-        addMonthToDataFrame(df, date_col="StartTime")
-
     return df
 
-def loadOperatorData(path, filename, preprocess=True):
-    df = read_csv(path + filename, low_memory=False, parse_dates=["EventTime"])
-
-    if preprocess == True:
-        addMonthToDataFrame(df, date_col="EventTime")
-
+def loadOperatorData(file_path):
+    df = read_csv(file_path, low_memory=False, parse_dates=["EventTime"])
     return df
 
 def filterAlarmData(df, months=None, sources_filter=[], monmentarly_filter=20, staling_filter=(60*60)*24, ingore_communication_alarms=False, min_alarms_per_source=10):
@@ -27,10 +19,10 @@ def filterAlarmData(df, months=None, sources_filter=[], monmentarly_filter=20, s
         f">>Preprocessing... \n   Months to include={months}\n  Ignore Sources={sources_filter}\n  Ingnore Momentarlily Alarms Filter={monmentarly_filter}seconds \n   Ignoreing Staling Alarms Filter={staling_filter/3600.0} hours, \n Ignore Communication Alarms = {ingore_communication_alarms} \n Remove sources whose count is less than {min_alarms_per_source}")
     
     if months is None:
-        months = df["Month"].unique()
+        months = df["Year-Month"].unique()
 
     df_new = df[(df["TimeDelta"] > monmentarly_filter) & (df["TimeDelta"] < staling_filter) & (
-        df["Month"].isin(months)) & (~df["SourceName"].isin(sources_filter))]
+        df["Year-Month"].isin(months)) & (~df["SourceName"].isin(sources_filter))]
 
     if ingore_communication_alarms==True:
         df_new = df_new[~df_new["Condition"].isin(["IOP", "IOP-"])]
@@ -42,7 +34,7 @@ def filterAlarmData(df, months=None, sources_filter=[], monmentarly_filter=20, s
     return df_new
 
 def getDFWithCommonSourcesInAllMonths(df):
-    each_month_source_names = [[sname for sname in df[df["Month"]==month]["SourceName"].unique()] for month in df["Month"].unique()]
+    each_month_source_names = [[sname for sname in df[df["Year-Month"]==month]["SourceName"].unique()] for month in df["Year-Month"].unique()]
 
     common_sourcenames_in_all_months = set.intersection(*[set(l) for l in each_month_source_names])
 
@@ -50,20 +42,23 @@ def getDFWithCommonSourcesInAllMonths(df):
     
     return df
 
-def _getTimeDelta(start_time, end_time):
-    delta = timedelta.total_seconds(end_time-start_time)
-    assert delta >= 0
-    return delta
+# def _getTimeDelta(start_time, end_time):
+#     delta = timedelta.total_seconds(end_time-start_time)
+#     assert delta >= 0
+#     return delta
 
 def _concatenateSourceNameAndCondition(sname, condition):
     return sname+"-"+condition
 
-def addTimeDeltaToDataFrame(df):
-    df["TimeDelta"] = df[["StartTime", "EndTime"]].apply(
-        lambda arg: _getTimeDelta(*arg), axis=1)
+# def addTimeDeltaToDataFrame(df):
+#     df["TimeDelta"] = df[["StartTime", "EndTime"]].apply(lambda arg: _getTimeDelta(*arg), axis=1)
 
-def addMonthToDataFrame(df, date_col):
-    df["Month"] = df[date_col].apply(lambda arg: arg.month)
+    # df["TimeDelta"] = df["EndTime"] -df["StartTime"]
+    # df["TimeDelta"] = df.apply( timedelta.total_seconds, arguments=["TimeDelta"])
+
+# def addMonthToDataFrame(df, date_col):
+#     # df["Month"] = df[date_col].apply(lambda arg: arg.month)
+#     df["Month"] = df.apply(lambda arg: arg.month, arguments=[date_col])
 
 def updatSourceNamewithCondition(df):
     df["SourceName"] = df[["SourceName", "Condition"]].apply(

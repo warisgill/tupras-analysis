@@ -1,9 +1,10 @@
 
 from datetime import timedelta
 from functools import partial
+
 from helpers.graphs import filterEdges, getInDegree, intersection_of_graphs
 import networkx as nx
-
+from multiprocessing import Pool
 
 
 def addOrUpdateNode(g, node):  # using partial thats why node as last arg
@@ -15,7 +16,7 @@ def addOrUpdateNode(g, node):  # using partial thats why node as last arg
 
     return False
 
-def constructSingleAlarmsRelationGraph(df_alarms, next_alarm_start_gapf, next_alarm_end_gapf):
+def constructSingleAlarmsRelationGraph(next_alarm_start_gapf, next_alarm_end_gapf, df_alarms):
     g = nx.DiGraph()
 
     # Adding Nodes
@@ -56,18 +57,23 @@ def constructMultipleAlarmsRelationGraphs(df_alarms, num_sub_graphs, start_time_
             index_ranges.append((start, start+batch_size))
     index_ranges[-1] = (index_ranges[-1][0], index_ranges[-1]
                         [1] + 1 + (df_alarms.shape[0] % num_sub_graphs))
+    
+
+    temp_dfs = []
 
     for t in index_ranges:
         print("        ----------------------------------")
         df1 = df_alarms.iloc[t[0]:t[1], :]
-        df1.reset_index(drop=True, inplace=True)
+        # df1.reset_index(drop=True, inplace=True)
         min_date = df1["StartTime"].min()
         max_date = df1["StartTime"].max()
-        print(">> Index Range = {}, Min & Max dates = {}".format(
-            t, (min_date.date(), max_date.date())))
-        g = constructSingleAlarmsRelationGraph(
-            df1, start_time_gapf, end_time_gapf)
-        graphs.append(g)
+        print(">> Index Range = {}, Min & Max dates = {}".format(t, (min_date.date(), max_date.date())))
+        # g = constructSingleAlarmsRelationGraph(df1, start_time_gapf, end_time_gapf)
+        # graphs.append(g)
+        temp_dfs.append(df1)
+    
+    with Pool(6) as p:
+      graphs = p.map(partial(constructSingleAlarmsRelationGraph,start_time_gapf, end_time_gapf),temp_dfs)
 
     print("        ----------------------------------")
 

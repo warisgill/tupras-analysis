@@ -1,6 +1,8 @@
 from helpers.graphs import filterEdges, intersection_of_graphs
 import networkx as nx
 from functools import partial
+from multiprocessing import Pool
+
 
 
 def __addOrUpdateEdge(g, e):
@@ -32,11 +34,16 @@ def __checkAction_OnAlarm(action, alarm):
         return False
 
 
-def __constructSingleAlarmsActionsGraph(df_alarms, df_actions):  # case 3
+def __constructSingleAlarmsActionsGraph(args):  # case 3
+    df_alarms  = args[0]
+    df_actions = args[1] 
     g = nx.DiGraph()  # Directed graph
-
-    assert len(df_alarms["Month"].unique()) == len(
-        df_actions["Month"].unique())
+    print(">> Test",df_alarms["Year-Month"].unique(), df_actions["Year-Month"].unique())
+    assert len(df_alarms["Year-Month"].unique()) == len(
+        df_actions["Year-Month"].unique())
+    for al_year_month, op_year_month in zip(df_alarms["Year-Month"].unique(), df_actions["Year-Month"].unique()):
+        assert al_year_month == op_year_month
+     
     print(">> # of Alarms:{} and Operator Actions:{}".format(
         df_alarms.shape[0], df_actions.shape[0]))
 
@@ -66,8 +73,7 @@ def __constructMultipleAlarmsActionsGraphs(df_alarms, df_actions, chunks):
     graphs = []
     index_ranges = []
     batch_size = df_alarms.shape[0]//chunks
-    # alarm_nodes = df_alarms["SourceName"].unique()
-    # action_nodes = df_actions["SourceName"].unique()
+    
 
     # Range Indexes
     for start in range(0, df_alarms.shape[0], batch_size):
@@ -77,6 +83,7 @@ def __constructMultipleAlarmsActionsGraphs(df_alarms, df_actions, chunks):
                         [1] + 1 + (df_alarms.shape[0] % chunks))
 #     index_ranges.reverse()
 #     print(">> Chunks = {}, Index Ranges = {}".format(chunks,index_ranges))
+    temp_dfs = []
 
     for t in index_ranges:
         print("        ----------------------------------")
@@ -89,12 +96,19 @@ def __constructMultipleAlarmsActionsGraphs(df_alarms, df_actions, chunks):
             f">> Index Range = {t}, Min Date ={min_date.date()} & Max date = {max_date.date()}")
         print(">> Filtering the Operator actions based on min-max dates ...")
 
-        df2 = df_actions[(df_actions["EventTime"] >= min_date)
+        df2 = df_actions.loc[(df_actions["EventTime"] >= min_date)
                          & (df_actions["EventTime"] <= max_date)]
         # df2.reset_index(drop=True, inplace=True)
 
-        g = __constructSingleAlarmsActionsGraph(df1, df2)
-        graphs.append(g)
+        temp_dfs.append((df1,df2))
+
+        # g = __constructSingleAlarmsActionsGraph(df1, df2)
+        # graphs.append(g)
+    
+    with Pool(6) as p:
+        graphs = p.map(__constructSingleAlarmsActionsGraph,temp_dfs)
+
+
 
     print("        ----------------------------------")
     return graphs

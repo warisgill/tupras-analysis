@@ -1,76 +1,77 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
-# %% [markdown]
-# ### combining alarms into 1 csv 
+# %%
+"""
+    Concatinating dfs i.e., all alarms into 1 file
+"""
+
 
 # %%
-import numpy as np
-import json
+import glob
 import pandas as pd
-from datetime import datetime
-from dateutil.parser import parse
+from datetime import datetime, timedelta
 
-
-# %%
-f0 = "formatted-pre-2-march2019.csv"
-f1 = "formatted-pre-2-nisan2019.csv"
-f2 = "formatted-pre-2-mayis2019.csv" 
-f3 = "formatted-pre-2-haziran2019.csv"
-
-output_f = 'formatted-all-month-alarms.csv' 
-
+output_f = 'final-all-months-alarms.csv' 
 PATH = "/home/waris/Github/tupras-analysis/data/"
 path = PATH + "/processed/alarms/"
 
-df0 = pd.read_csv(path + f0, parse_dates = ["StartTime","EndTime"])
-df1 = pd.read_csv(path + f1, parse_dates = ["StartTime","EndTime"])
-df2 = pd.read_csv(path + f2, parse_dates = ["StartTime","EndTime"])
-df3 = pd.read_csv(path + f3, parse_dates = ["StartTime","EndTime"])
-
-
 # %%
-df0.tail(2)
 
 
-# %%
-df1.tail(2)
 
+fps = [f for f in glob.glob(path+ "*.csv") if f.find("pre-2-alarms-")!=-1]
+print(f">> Files to process {fps}")
+dfs_list = []
+for f in fps:
+    print(f">> === File: {f.split('/')[-1]}")
+    df = pd.read_csv(f, parse_dates = ["StartTime","EndTime"])
+    
+    df["TimeDelta"] = df[["StartTime", "EndTime"]].apply(lambda arg: timedelta.total_seconds(arg[1]-arg[0]) , axis=1)
+    df["Year-Month"] =df["StartTime"].apply(lambda arg: (arg.year,arg.month))
+    print(f">>Uninque month and year {df['Year-Month'].unique()}")
+    dfs_list.append(df)
 
-# %%
-df2.tail(2)
-
-
-# %%
-df3.tail(2)
-
-
-# %%
-df = pd.concat([df0,df1, df2, df3], ignore_index=True)
-df.to_csv( path + output_f, index=False)
+df = pd.concat(dfs_list, ignore_index=True)
+df.to_csv( path+"final/"+ output_f, index=False)
 df
 
-# %% [markdown]
-# # Concatinating Operator Files
 
 # %%
-f1 = "operator-pre-1-MarchOperation_v2.csv"
-f2 = "operator-pre-1-AprilOperation_v2.csv"
-f3= "operator-pre-1-MayOperation_v2.csv"
-f4 = "operator-pre-1-JuneOperation_v2.csv"
+"""
+    Concatinating operator files
+"""
+# ServerProgID ServerNodeName	SubscriptionName	SourceName	EventTime	EventTime_MS	Severity	Message	Quality	Condition	SubCondition	Mask	NewState	EventType	EventCategory	AckReq	ActiveTime	ActiveTime_MS	Cookie	ActorID	Attributes	Area
 
-output_f = 'operator-all-month-actions.csv' 
 
 path = PATH + "/processed/operator-actions/"
-df0 = pd.read_csv(path + f1, parse_dates = ["EventTime"])
-df1 = pd.read_csv(path + f2, parse_dates = ["EventTime"])
-df2 = pd.read_csv(path + f3, parse_dates = ["EventTime"])
-df3 = pd.read_csv(path + f4, parse_dates = ["EventTime"])
 
-df = pd.concat([df0,df1, df2, df3], ignore_index=True)
-df.to_csv( path + output_f, index=False)
+cols = ["MachineName","SourceName","EventTime" ]
+op_dfs = []
+for f in glob.glob(path+"*.csv"):
+    print(f">> Processing Op {f.split('/')[-1]}")
+    df= pd.read_csv(f, parse_dates=["EventTime"], usecols=cols)
+    df["Year-Month"] = df["EventTime"].apply(lambda arg: (arg.year,arg.month))
+    print(">> unique Year and Month",df["Year-Month"].unique())
+    op_dfs.append(df)
+
+
+
+df = pd.concat(op_dfs, ignore_index=True)
+df.to_csv( path+"final/final-all-month-actions.csv", index=False)
 df
+
+
+
 
 
 # %%
 
+# # testing
+# path = PATH + "/processed/alarms/"
+# df = pd.read_csv(path+"pre-2-alarms-2019_6.csv", parse_dates=["StartTime"])
+# df["Year-Month"] = df["StartTime"].apply(lambda arg: (arg.year,arg.month))
 
+
+# %%
+# df["Year-Month"].unique()
+
+# df[df["Year-Month"]==(2019,6)]
+# %%

@@ -1,13 +1,14 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
-# %% [markdown]
-# ### Summary
-# Record mean 1 row of the csv file. 
 
-# This notebook converts the records into alarms. 
+"""
+    Summary
+    Record mean 1 row of the csv file. 
+    # This notebook converts the records into alarms. 
+"""
+
 
 # %%
 import pandas as pd
+import glob
 
 #%%
 
@@ -123,19 +124,16 @@ def _convertRecordsToAlarmsOld(records):
 
 
 # %%
-# files = ["march2019.csv"]
-files = ["haziran2019.csv","march2019.csv","mayis2019.csv","nisan2019.csv"]
-files = ["formatted-pre-1-"+f for f in files]
-cols = ["MachineName","SourceName","EventTime", "Message","MessageType","Quality","Condition","Mask","NewState","Status"]
+
+cols = ["MachineName","SourceName","EventTime", "Message","MessageType","Condition"]
 PATH = "/home/waris/Github/tupras-analysis/data/"
 path = PATH + "/processed/alarms/"
 
 # %%
-for f in files:    
-    print("==================== File : {} =============".format(f))
-    input_fname = f
-    output_fname = "formatted-pre-2-" + input_fname.split("-")[-1]
-    df = pd.read_csv(path + input_fname, low_memory=False, usecols=cols ,parse_dates=["EventTime"])
+for p in glob.glob(path+"*.csv"):  
+    print(f"==================== File : {p.split('/')[-1]} =============")
+    
+    df = pd.read_csv(p, low_memory=False, usecols=cols,parse_dates=["EventTime"])
 
     assert len(df["MachineName"].unique()) == 1 # all the alarms should be related to the same unit
     
@@ -166,11 +164,11 @@ for f in files:
             differs.append(sname)
 
     # writing to files
-    df2 = pd.DataFrame(alarms)
-    # maskSourceNames(df2) # at the end 
-    df2.to_csv(path + output_fname, index = False)
+    df_out = pd.DataFrame(alarms) 
+    out_fname = f"pre-2-alarms-{p.split('/')[-1].split('-')[-1]}"  
+    df_out.to_csv(path+out_fname, index = False)
     print("Differs in 2 Algos",differs,len(differs))
-    print(">>",df2.info())
+    print(">> ",df_out.info())
 
 
 print(">> Complete")
