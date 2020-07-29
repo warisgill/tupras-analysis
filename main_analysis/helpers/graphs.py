@@ -61,3 +61,4 @@ def getInDegree(g, n):
 
 def getOutDegree(g, n):
     return g.out_degree(n, weight="weight")
+

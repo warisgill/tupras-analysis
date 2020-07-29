@@ -69,41 +69,45 @@ print(f">> True Sources ({len(true_sources)}) = {true_sources} \n\n>> Nuisance S
 
 # %%
 print(">> Before Raw Alarms", df_alarms_new.shape[0])
-df_alarms_new = df_alarms_new[df_alarms_new["SourceName"].isin(nuisance_sources)] # only analyze the nusiance alrms
-print(">> After: Only Nusiance alarms", df_alarms_new.shape[0])
-source2count = dict(df_alarms_new["SourceName"].value_counts()) # do not move it from here. 
+df_alarms_nuisance_temp = df_alarms_new[df_alarms_new["SourceName"].isin(nuisance_sources)] # only analyze the nusiance alrms
+print(">> After: Only Nusiance alarms", df_alarms_nuisance_temp.shape[0])
+source2count = dict(df_alarms_nuisance_temp["SourceName"].value_counts()) # do not move it from here. 
 
 # %%
-"""Grouping of Source Names"""
-max_edge_drop_factor = 1.3 # factor x weight < count ignore such edge 
-iteration = 0
-edge_drop_factor = 1.0 # start from one to one relation and go to max edge drop factor
-while edge_drop_factor < max_edge_drop_factor:
-    g = None
-    while True:
-        iteration += 1
-        print(
-            f">> ==========Level=1 Iteration of Merging Components = {iteration} =============")
-        g, components, node2common_name = analyzeAlarmdata(df_alarms_new, num_sub_graphs=4, min_intersection_f=3, next_start_gap=60*2,  next_end_gap=60*20, edge_drop_factor=edge_drop_factor)
+def groupNuisanceSourceNamesInDF(df, max_edge_drop_factor=1.3, num_sub_graphs=4, min_intersection_f=3, next_start_gap=60*2,  next_end_gap=60*20):
+    """Grouping of Source Names"""
+    # max_edge_drop_factor = 1.3 # factor x weight < count ignore such edge 
+    iteration = 0
+    edge_drop_factor = 1.0 # start from one to one relation and go to max edge drop factor
+    while edge_drop_factor < max_edge_drop_factor:
+        g = None
+        while True:
+            iteration += 1
+            print(
+                f">> ==========Level=1 Iteration of Merging Components = {iteration} =============")
+            g, components, node2common_name = analyzeAlarmdata(df, num_sub_graphs=num_sub_graphs, min_intersection_f=min_intersection_f, next_start_gap=next_start_gap,  next_end_gap=next_end_gap, edge_drop_factor=edge_drop_factor)
 
-        df_alarms_new["SourceName"] = df_alarms_new["SourceName"].apply(lambda name: node2common_name[name] if name in node2common_name.keys() else name)
-        # print(components)
-        if len(components) == 0:
-            break
-    edge_drop_factor += 0.1
+            df["SourceName"] = df["SourceName"].apply(lambda name: node2common_name[name] if name in node2common_name.keys() else name)
+            # print(components)
+            if len(components) == 0:
+                break
+        edge_drop_factor += 0.1
 
-    groups = ["".join(s) for s in df_alarms_new["SourceName"].unique() if s.find("=>") != -1]
-    print(f">>Edge drop factor= {edge_drop_factor} and final Groups:  Length = {len(groups)}, Groups={groups}")
+        groups = ["".join(s) for s in df["SourceName"].unique() if s.find("=>") != -1]
+        print(f">>Edge drop factor= {edge_drop_factor} and final Groups:  Length = {len(groups)}, Groups={groups}")
 
 
-plotSourceAndCondtionHistogram(df_alarms_new) # to visualize which sourcenames are grouped
+
+
+groupNuisanceSourceNamesInDF(df_alarms_nuisance_temp) # grouped sources as 1 
+plotSourceAndCondtionHistogram(df_alarms_nuisance_temp) # to visualize which sourcenames are grouped
 
 #%%
 """ How many Nuisance alarms will be reduced if we do grouping? """
 
-main_sources =[name for name in df_alarms_new["SourceName"].unique() if name.find("=>") ==-1]
+main_sources =[name for name in df_alarms_nuisance_temp["SourceName"].unique() if name.find("=>") ==-1]
 
-groups =  [name for name in df_alarms_new["SourceName"].unique() if name.find("=>") !=-1]
+groups =  [name for name in df_alarms_nuisance_temp["SourceName"].unique() if name.find("=>") !=-1]
 print(">> Groups",groups)
 
 groups_count = [[(sname,source2count[sname]) for sname in group.split("=>")] for group in groups]  
@@ -126,6 +130,141 @@ y_axis = [total_alarms, total_alarms-num_useless_alarms]
 
 plotBargraph(x_axis = x_axis, y_axis=y_axis, xtitle="",ytitle="# of alarms")
 
+
+
+# %%
+import plotly.graph_objects as go
+
+from helpers import alarms
+
+print(useless_snames)
+print([sname for sname,_ in useless_snames ])
+
+
+df_alarms_nuisance = df_alarms_new[df_alarms_new["SourceName"].isin(nuisance_sources)] # only analyze the nusiance alrms
+
+# df_all_nuisance = df_alarms_nuisance.loc[df_alarms_nuisance["SourceName"].isin(useless_snames+heads_snames)]
+df_use_less = df_alarms_nuisance[df_alarms_nuisance["SourceName"].isin([sname for sname,_ in useless_snames ])]
+
+month2_all_nuisance = dict(df_alarms_nuisance["Year-Month"].value_counts())
+month2_groupe_nuisance = dict(df_use_less["Year-Month"].value_counts()) 
+
+print(df_use_less["Year-Month"].value_counts())
+
+print(month2_all_nuisance,month2_groupe_nuisance)
+
+
+x_axis = alarms.sortMonthYearTuple(month2_all_nuisance.keys()) 
+
+y1 = [month2_all_nuisance[month_year] for month_year in x_axis]
+trace1 = go.Bar(x=x_axis,y=y1, name="Total Nuisance Alarms",text=y1, textposition='outside' )
+y2 = [month2_groupe_nuisance[month_year] for month_year in x_axis]
+trace2 = go.Bar(x= x_axis, y= y2,name="Grouped Nuisance Alarms",text=y2, textposition='outside')
+
+fig = go.Figure()
+fig.add_trace(trace1)
+fig.add_trace(trace2)
+
+
+fig.update_layout(
+    xaxis_tickfont_size=14,
+    yaxis=dict(
+        title='Number of Alarms',
+        titlefont_size=16,
+        tickfont_size=14,
+    ),
+    xaxis=dict(
+        title = "Month",
+        titlefont_size=16,
+        tickfont_size=14,
+    ),
+    legend=dict(
+        x=0,
+        y=1.0,
+        bgcolor='rgba(255, 255, 255, 0)',
+        bordercolor='rgba(255, 255, 255, 0)'
+    ),
+    barmode='group',
+    height=600, 
+    width=1100,
+    template='seaborn', # ggplot2
+    # bargap=0. # gap between bars of adjacent location coordinates.
+    bargroupgap=0.1 # gap between bars of the same location coordinate.
+)
+
+fig.update_traces(texttemplate='%{text:.3s}', textposition='outside',textfont_size=80)
+# fig.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+fig.show()
+
+
+
+# %%
+
+# %%
+
+"""
+    # For Percentage
+"""
+
+print(useless_snames)
+print([sname for sname,_ in useless_snames ])
+
+
+df_alarms_nuisance = df_alarms_new[df_alarms_new["SourceName"].isin(nuisance_sources)] # only analyze the nusiance alrms
+
+# df_all_nuisance = df_alarms_nuisance.loc[df_alarms_nuisance["SourceName"].isin(useless_snames+heads_snames)]
+df_use_less = df_alarms_nuisance[df_alarms_nuisance["SourceName"].isin([sname for sname,_ in useless_snames ])]
+
+month2_all_nuisance = dict(df_alarms_nuisance["Year-Month"].value_counts())
+month2_groupe_nuisance = dict(df_use_less["Year-Month"].value_counts()) 
+
+print(df_use_less["Year-Month"].value_counts())
+
+print(month2_all_nuisance,month2_groupe_nuisance)
+
+
+x_axis = alarms.sortMonthYearTuple(month2_all_nuisance.keys()) 
+
+y1 = [month2_all_nuisance[month_year] for month_year in x_axis]
+# trace1 = go.Bar(x=x_axis,y=y1, name="Total Nuisance Alarms",text=y1, textposition='outside' )
+y2 = [(month2_groupe_nuisance[month_year]/month2_all_nuisance[month_year])*100 for month_year in x_axis]
+trace2 = go.Bar(x= x_axis, y= y2,name="Grouped Nuisance Alarms",text=y2, textposition='outside')
+
+fig = go.Figure()
+# fig.add_trace(trace1)
+fig.add_trace(trace2)
+
+
+fig.update_layout(
+    xaxis_tickfont_size=14,
+    yaxis=dict(
+        title='Reduction of Nuisance Alarms',
+        titlefont_size=16,
+        tickfont_size=14,
+        # range=[0,100],
+    ),
+    xaxis=dict(
+        title = "Month",
+        titlefont_size=16,
+        tickfont_size=14,
+    ),
+    legend=dict(
+        x=0,
+        y=1.0,
+        bgcolor='rgba(255, 255, 255, 0)',
+        bordercolor='rgba(255, 255, 255, 0)'
+    ),
+    barmode='group',
+    height=600, 
+    width=1100,
+    template='seaborn', # ggplot2
+    # bargap=0. # gap between bars of adjacent location coordinates.
+    bargroupgap=0.1 # gap between bars of the same location coordinate.
+)
+
+fig.update_traces(texttemplate='%{text:.3s}%', textposition='outside',textfont_size=80)
+# fig.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+fig.show()
 
 
 # %%

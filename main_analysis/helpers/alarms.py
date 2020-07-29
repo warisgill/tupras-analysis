@@ -69,4 +69,15 @@ def convertSourceNamesToAlias(df):
     name2alias = {v: k for k, v in alias2name.items()}
     df["SourceName"] = df["SourceName"].apply(lambda sname: name2alias[sname])
     return name2alias, alias2name
+
+
+def sortMonthYearTuple(l):
+    years = sorted(set(eval(st)[0] for st in l))
+    year_months = []
+    for year in years:
+        year_months += sorted([eval(st) for st in l if eval(st)[0]==year],key=lambda arg: arg[1])
+
+    year_months = [str(v) for v in year_months]
+
+    return year_months
     

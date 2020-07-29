@@ -5,6 +5,7 @@ from helpers.ploting import plotBargraph, plotSubBarGraphs
 from helpers.graphs import filterEdges
 from helpers.operator_actions import __getTrueAndNuisanceSources, __getFinalOperatorAlarmRelationGraph, getTrueAndNuisanceSourceNames
 from helpers.alarms import  filterAlarmData, getDFWithCommonSourcesInAllMonths, loadAlarmsData, loadOperatorData
+from helpers import alarms
 import time
 
 # %%
@@ -121,5 +122,64 @@ print(
 # for cross check 
 true_s, nuisance_s = getTrueAndNuisanceSourceNames(df_alarms_new,df_actions_new,num_sub_graphs,min_intersection_f,edge_filter=edge_filter)
 print(f"Cross Checking \n \n True Alarms ({len(true_s)}) = {true_s} \n\nNuisance Sources ({len(nuisance_s)}) = {nuisance_s}")
+
+# %%
+import plotly.graph_objects as go
+
+df_true_sources = df_alarms_new.loc[df_alarms_new["SourceName"].isin(true_s)]
+df_nuisance_sources = df_alarms_new.loc[df_alarms_new["SourceName"].isin(nuisance_s)]
+
+month2_A_true = dict(df_true_sources["Year-Month"].value_counts())
+month2_A_nuisance = dict(df_nuisance_sources["Year-Month"].value_counts()) 
+
+
+
+
+
+
+x_axis = alarms.sortMonthYearTuple(month2_A_true.keys()) 
+y_true = [month2_A_true[month_year] for month_year in x_axis]
+trace1 = go.Bar(x=x_axis,y=y_true, name="True Alarms",text=y_true, textposition='outside' )
+y_nuisance = [month2_A_nuisance[month_year] for month_year in x_axis]
+trace2 = go.Bar(x= x_axis, y= y_nuisance,name="Nuisance Alarms",text=y_nuisance, textposition='outside')
+
+fig = go.Figure()
+fig.add_trace(trace1)
+fig.add_trace(trace2)
+
+
+fig.update_layout(
+    xaxis_tickfont_size=14,
+    yaxis=dict(
+        title='Number of Alarms',
+        titlefont_size=16,
+        tickfont_size=14,
+    ),
+    xaxis=dict(
+        title = "Month",
+        titlefont_size=16,
+        tickfont_size=14,
+    ),
+    legend=dict(
+        x=0,
+        y=1.0,
+        bgcolor='rgba(255, 255, 255, 0)',
+        bordercolor='rgba(255, 255, 255, 0)'
+    ),
+    barmode='group',
+    height=600, 
+    width=1100,
+    template='seaborn', # ggplot2
+    # bargap=0. # gap between bars of adjacent location coordinates.
+    bargroupgap=0.1 # gap between bars of the same location coordinate.
+)
+
+fig.update_traces(texttemplate='%{text:.3s}', textposition='outside',textfont_size=80)
+# fig.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+fig.show()
+
+
+
+
 
 # %%
