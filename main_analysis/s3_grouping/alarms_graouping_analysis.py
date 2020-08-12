@@ -101,6 +101,8 @@ def groupNuisanceSourceNamesInDF(df, max_edge_drop_factor=1.3, num_sub_graphs=4,
 
 groupNuisanceSourceNamesInDF(df_alarms_nuisance_temp) # grouped sources as 1 
 plotSourceAndCondtionHistogram(df_alarms_nuisance_temp) # to visualize which sourcenames are grouped
+#%%
+print(f"\n\n>> Number of Grouped Nuisance Alarms: {len(df_alarms_nuisance_temp['SourceName'].unique())}, Source = {df_alarms_nuisance_temp['SourceName'].unique()}" )
 
 #%%
 """ How many Nuisance alarms will be reduced if we do grouping? """
@@ -159,7 +161,7 @@ x_axis = alarms.sortMonthYearTuple(month2_all_nuisance.keys())
 y1 = [month2_all_nuisance[month_year] for month_year in x_axis]
 trace1 = go.Bar(x=x_axis,y=y1, name="Total Nuisance Alarms",text=y1, textposition='outside' )
 y2 = [month2_groupe_nuisance[month_year] for month_year in x_axis]
-trace2 = go.Bar(x= x_axis, y= y2,name="Grouped Nuisance Alarms",text=y2, textposition='outside')
+trace2 = go.Bar(x= x_axis, y= y2,name="# of useless alarms",text=y2, textposition='outside')
 
 fig = go.Figure()
 fig.add_trace(trace1)
@@ -225,10 +227,10 @@ print(month2_all_nuisance,month2_groupe_nuisance)
 
 x_axis = alarms.sortMonthYearTuple(month2_all_nuisance.keys()) 
 
-y1 = [month2_all_nuisance[month_year] for month_year in x_axis]
+# y1 = [month2_all_nuisance[month_year] for month_year in x_axis]
 # trace1 = go.Bar(x=x_axis,y=y1, name="Total Nuisance Alarms",text=y1, textposition='outside' )
 y2 = [(month2_groupe_nuisance[month_year]/month2_all_nuisance[month_year])*100 for month_year in x_axis]
-trace2 = go.Bar(x= x_axis, y= y2,name="Grouped Nuisance Alarms",text=y2, textposition='outside')
+trace2 = go.Bar(x= x_axis, y= y2,name="useless alarms",text=y2, textposition='outside')
 
 fig = go.Figure()
 # fig.add_trace(trace1)

@@ -1,6 +1,6 @@
 from datetime import timedelta
 from pandas import read_csv
-import vaex
+import pandas as pd
 
 # %%
 
@@ -80,4 +80,58 @@ def sortMonthYearTuple(l):
     year_months = [str(v) for v in year_months]
 
     return year_months
-    
+
+
+
+def __removeChatteringAlarmsHelper(alarms, chattering_timedelta_threshold=60.0, chattering_count_threshold=3):
+    """Find the chatterings in an alarms list from the same source.  
+    """
+
+    alarms_without_chattering = []
+    alarms = [alarm for alarm in sorted(alarms, key=lambda arg: arg["StartTime"], reverse=False)]
+    i = 0
+    j = 0
+
+    while i < (len(alarms)):
+        alarms_without_chattering.append(alarms[i])
+        prev_start = alarms[i]["StartTime"]
+        prev_end = alarms[i]["EndTime"]
+        count_alarms = 0
+        j = i + 1
+        while j < len(alarms):
+            next_start = alarms[j]["StartTime"]
+            next_end = alarms[j]["EndTime"]
+
+            # this assert is very important: the prev alarm has to turn off before the start of
+            # the next one
+            assert(prev_start <= next_start)
+            assert(prev_end <= next_start)
+            assert(prev_end <= next_end)
+
+            delta = timedelta.total_seconds(next_start - prev_start)
+            assert (delta >= 0)
+            
+            if delta > chattering_timedelta_threshold:
+                break
+            count_alarms += 1
+            
+            j += 1
+        
+        if count_alarms >= chattering_count_threshold:
+            i = j
+        else:
+            i += 1
+
+    return alarms_without_chattering
+
+def removeChatteringAlarms(df):
+    alarms_without_chatterings = []
+    for sname in df["SourceName"].unique():
+        df_source = df.loc[df['SourceName'].isin([sname])]
+
+        for condition in df_source["Condition"].unique():
+            df_condition = df_source.loc[df_source['Condition'].isin([condition])]
+            alarms = __removeChatteringAlarmsHelper(df_condition.to_dict(orient="records"))
+            alarms_without_chatterings = alarms_without_chatterings + alarms
+
+    return pd.DataFrame(alarms_without_chatterings)
