@@ -1,17 +1,16 @@
 
 # %%
+from helpers.ploting import plotBargraph
 import torch
 from torch import nn
 import numpy as np
 import pickle
 from sklearn import metrics
-
 import seaborn as sns; sns.set()
 import matplotlib.pyplot as plt
 
 
 #%%
-
 def get_batches(arr1,arr2, batch_size, seq_length):
     '''Create a generator that returns batches of size
        batch_size x seq_length from arr.
@@ -41,8 +40,6 @@ def get_batches(arr1,arr2, batch_size, seq_length):
         # The features
         x = arr1[:,n:n+seq_length]
         y = arr2[:,n:n+seq_length]
-        
-        
         yield x, y
 
 #%%
@@ -87,11 +84,11 @@ else:
 
 
 # %%
-class AlarmRNN(nn.Module):
+class AlarmRNN1(nn.Module):
     
     def __init__(self,tokens,int2vocab,vocab2int,embedding_dim,n_hidden=256, n_layers=2,
                                drop_prob=0.5, lr=0.001):
-        super(AlarmRNN,self).__init__()
+        super(AlarmRNN1,self).__init__()
         self.drop_prob = drop_prob
         self.n_layers = n_layers
         self.n_hidden = n_hidden
@@ -151,34 +148,243 @@ class AlarmRNN(nn.Module):
                       weight.new(self.n_layers, batch_size, self.n_hidden).zero_())
         
         return hidden
+
+class AlarmRNN2(nn.Module):
+    
+    def __init__(self,tokens,int2vocab,vocab2int,embedding_dim,n_hidden=256, n_layers=2,
+                               drop_prob=0.5, lr=0.001):
+        super(AlarmRNN2,self).__init__()
+        self.drop_prob = drop_prob
+        self.n_layers = n_layers
+        self.n_hidden = n_hidden
+        self.lr = lr
         
+        # creating character dictionaries
+        self.chars = tokens # vocab
+        # int2vocab = dict(enumerate(self.chars))
+        # vocab2int = {v:k for k,v in int2vocab.items()}
+
+        self.int2char = int2vocab #dict(enumerate(self.chars))
+        self.char2int = vocab2int  #{ch: ii for ii, ch in self.int2char.items()}
+                
+        ## TODO: define the layers of the model
+        self.embedding = nn.Embedding(len(self.chars), embedding_dim)
+        self.lstm = nn.LSTM(input_size=embedding_dim, hidden_size=self.n_hidden, num_layers=self.n_layers,dropout=self.drop_prob, batch_first=True)
+        self.droput = nn.Dropout(p=self.drop_prob)
+        # self.fc1 = nn.Linear(in_features=self.n_hidden, out_features=self.n_hidden)
+        # self.relu1 = nn.ReLU()
+        # self.fc2 = nn.Linear(in_features=self.n_hidden, out_features=self.n_hidden)
+        # self.relu2 = nn.ReLU()
+        self.fc3 = nn.Linear(in_features=self.n_hidden, out_features=len(self.chars)) 
+        self.softmax = nn.LogSoftmax(dim=1)  
+    
+    def forward(self, x, hidden):
+        ''' Forward pass through the network. 
+            These inputs are x, and the hidden/cell state `hidden`. '''
+                
+        ## TODO: Get the outputs and the new hidden state from the lstm
+        x = x.long()
+        embeds = self.embedding(x)
+        out, hidden = self.lstm(embeds,hidden)
+        out = self.droput(out)
+        # Contiguous variables: If you are stacking up multiple LSTM outputs, it may be necessary to use .contiguous() to reshape the output.
+        out = out.contiguous().view(-1,self.n_hidden)
+        # out = self.fc1(out)
+        # out = self.relu1(out)
+        # out = self.fc2(out)
+        # out = self.relu2(out)
+        out = self.fc3(out)
+        out = self.softmax(out)
+        # return the final output and the hidden state
+        return out, hidden
+    
+    
+    def init_hidden(self, batch_size):
+        ''' Initializes hidden state '''
+        # Create two new tensors with sizes n_layers x batch_size x n_hidden,
+        # initialized to zero, for hidden state and cell state of LSTM
+        weight = next(self.parameters()).data
+        
+        if (train_on_gpu):
+            hidden = (weight.new(self.n_layers, batch_size, self.n_hidden).zero_().cuda(),
+                  weight.new(self.n_layers, batch_size, self.n_hidden).zero_().cuda())
+        else:
+            hidden = (weight.new(self.n_layers, batch_size, self.n_hidden).zero_(),
+                      weight.new(self.n_layers, batch_size, self.n_hidden).zero_())
+        
+        return hidden
+
+class AlarmRNN3(nn.Module):
+    
+    def __init__(self,tokens,int2vocab,vocab2int,embedding_dim,n_hidden=256, n_layers=2,
+                               drop_prob=0.5, lr=0.001):
+        super(AlarmRNN3,self).__init__()
+        self.drop_prob = drop_prob
+        self.n_layers = n_layers
+        self.n_hidden = n_hidden
+        self.lr = lr
+        
+        # creating character dictionaries
+        self.chars = tokens # vocab
+        # int2vocab = dict(enumerate(self.chars))
+        # vocab2int = {v:k for k,v in int2vocab.items()}
+
+        self.int2char = int2vocab #dict(enumerate(self.chars))
+        self.char2int = vocab2int  #{ch: ii for ii, ch in self.int2char.items()}
+                
+        ## TODO: define the layers of the model
+        self.embedding = nn.Embedding(len(self.chars), embedding_dim)
+        self.gru = nn.GRU(input_size=embedding_dim, hidden_size=self.n_hidden, num_layers=self.n_layers,dropout=self.drop_prob, batch_first=True)
+        # self.droput = nn.Dropout(p=self.drop_prob)
+        # self.fc1 = nn.Linear(in_features=self.n_hidden, out_features=self.n_hidden)
+        # self.relu1 = nn.ReLU()
+        # self.fc2 = nn.Linear(in_features=self.n_hidden, out_features=self.n_hidden)
+        # self.relu2 = nn.ReLU()
+        self.fc3 = nn.Linear(in_features=self.n_hidden, out_features=len(self.chars)) 
+        self.softmax = nn.LogSoftmax(dim=1)  
+    
+    def forward(self, x, hidden):
+        ''' Forward pass through the network. 
+            These inputs are x, and the hidden/cell state `hidden`. '''
+                
+        ## TODO: Get the outputs and the new hidden state from the lstm
+        
+        # print(x.shape)
+        # print(hidden)
+        x = x.long()
+    
+
+        embeds = self.embedding(x)
+        out, hidden = self.gru(embeds,hidden)
+        # out = self.droput(out)
+        # Contiguous variables: If you are stacking up multiple LSTM outputs, it may be necessary to use .contiguous() to reshape the output.
+        out = out.contiguous().view(-1,self.n_hidden)
+        # out = self.fc1(out)
+        # out = self.relu1(out)
+        # out = self.fc2(out)
+        # out = self.relu2(out)
+        out = self.fc3(out)
+        out = self.softmax(out)
+        # return the final output and the hidden state
+        return out, hidden
+    
+    
+    def init_hidden(self, batch_size):
+        ''' Initializes hidden state '''
+        # Create two new tensors with sizes n_layers x batch_size x n_hidden,
+        # initialized to zero, for hidden state and cell state of LSTM
+         
+        if (train_on_gpu):
+             device = torch.device("cuda")
+        else:
+             device = torch.device("cpu") 
+        
+
+        weight = next(self.parameters()).data
+        hidden = weight.new(self.n_layers, batch_size, self.n_hidden).zero_().to(device)
+        return hidden
+
 
 
 # %%
+import plotly.graph_objects as go
 
 def plotConfusionMatrix(predictions, targets, labels):
-    
     cm = metrics.confusion_matrix(targets, predictions, normalize="true", labels=labels)
-    print(cm)
-
-    data = [[None for i in range(cm.shape[0])]
-            for j in range(cm.shape[0])]
+    
+    cm = cm * 100 # for percentage
+    
+    data = [[None for i in range(cm.shape[0])] for j in range(cm.shape[0])]
 
     if len(data) == 0:
         print(" --------------> Heatmap:no data exist in heatmap")
-        # return None
 
-    print(">> Dimension", len(data[0]), len(data))
+    # print(">> Dimension", len(data[0]), len(data))
+
+    more_than_70 = []
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[0]):
+            if cm[i,j] > 0.01:
+                data[i][j] = cm[i,j]
+
+            if cm[i,j] >= 70 and i ==j:
+                more_than_70.append((i,j, cm[i,j]))
     
-    # for i in range(cm.shape[0]):
-    #     for j in range(cm.shape[0]):
-    #         if cm[i,j] > 0.000001:
-    #             data[i][j] = cm[i,j]
+    
+    snames_sub = [f"S{i}" for i,j,val in more_than_70]
+    trace = go.Bar(x=snames_sub,y=[val for _,_,val in more_than_70], text=[f"{val:.2f}"  for _,_,val in more_than_70], textposition="auto")
+    
+    fig = go.Figure(data=trace) 
+    # # updating the figure properties
+    # fig.update_xaxes(title_text="Source Name")
+    # fig.update_yaxes(title_text="Accuracy (%)", range=[0,100])
+    fig.update_layout(
+    # xaxis_tickfont_size=14,
+    yaxis=dict(
+        title='Accuracy (%)',
+        titlefont_size=16,
+        tickfont_size=14,
+    ),
+    xaxis=dict(
+        title = "Source Name",
+        titlefont_size=16,
+        tickfont_size=14,
+    ),
+    legend=dict(
+        x=0,
+        y=1.0,
+        bgcolor='rgba(255, 255, 255, 0)',
+        bordercolor='rgba(255, 255, 255, 0)'
+    ),
+    # barmode='group',
+    height=600, 
+    width=1100,
+    template='seaborn', # ggplot2
+    # bargap=0. # gap between bars of adjacent location coordinates.
+    bargroupgap=0.1 # gap between bars of the same location coordinate.
+    )
+    # fig.show()
+    print(f">> Totoal source whose Accuracy is more than 70% = {len(more_than_70)}")
 
-    # Set up the matplotlib figure
-    f, ax = plt.subplots(figsize=(25, 25))
-    sns.heatmap(cm,annot=True, fmt=".2f")
-    plt.show()
+
+
+    temp_confusion_matrix = [[None for i in range(len(more_than_70))] for j in range(len(more_than_70))]
+    # snames_main = [f"S{i}" for i in range(len(labels))]
+    
+    # print(snames_sub)
+    index = 0
+    for i in range(len(more_than_70)):
+        for j in range(len(more_than_70)):
+            if i ==j:
+                temp_confusion_matrix[i][j] = more_than_70[index]
+                index += 1
+    
+    
+
+
+    # # Set up the matplotlib figure
+    # f, ax = plt.subplots(figsize=(25, 25))
+    # sns.heatmap(cm,annot=True, ax = ax, fmt=".2f")
+    # plt.show()
+
+    fig = go.Figure(data=go.Heatmap(
+        z= data,
+        colorscale='Greys',
+        x = [f"S{i}" for i in range (len(labels))],
+        y = [f"S{i}" for i in range (len(labels))],
+        hoverongaps=False, 
+        hovertemplate=None
+    ))
+    fig.update_layout(
+        width=1000,
+        height=1000,
+        xaxis_nticks=cm.shape[0],
+        yaxis_nticks=cm.shape[0],
+        # yaxis=dict(title='Child', titlefont_size=16, tickfont_size=14),
+        # xaxis=dict(title='Parent', titlefont_size=16, tickfont_size=14)
+    )
+    # fig.show()
+
 
 def validationReport(net, predictions, targets, ignore):
 
@@ -190,9 +396,9 @@ def validationReport(net, predictions, targets, ignore):
 
     plotConfusionMatrix(predictions, targets,labels)
     report = metrics.classification_report(targets,predictions,labels=labels)
-    print(report)
+    # print(report)
 
-def train(net,data,seq_length,batch_size,epochs=10, lr=0.001,wieght_decay=0,clip=5, print_every=10, report_every=10):
+def train(m_name,net,data,seq_length,batch_size,epochs=10, lr=0.001,wieght_decay=0,clip=5, print_every=10, report_every=10):
     ''' Training a network 
     
         Arguments
@@ -216,15 +422,20 @@ def train(net,data,seq_length,batch_size,epochs=10, lr=0.001,wieght_decay=0,clip
     
     # criterion = nn.CrossEntropyLoss()
     criterion = nn.NLLLoss(ignore_index=net.char2int["NoName"])
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, 'min',patience=3,verbose=True, factor=0.90)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, 'min',patience=10,verbose=True, factor=0.5)
     
     if(train_on_gpu):
         net.cuda()
     
     loss = 0
+
+    all_epochs_train_lossess = []
+    all_epochs_valid_lossess = [] 
+
     for e in range(epochs):
         # initialize hidden state
         h = net.init_hidden(batch_size)
+        train_losses = []
         for x, y in get_batches(data["train_inputs"], data["train_targets"], batch_size, seq_length):
 
             train_inputs, train_targets = torch.from_numpy(x), torch.from_numpy(y)
@@ -234,8 +445,8 @@ def train(net,data,seq_length,batch_size,epochs=10, lr=0.001,wieght_decay=0,clip
 
             # Creating new variables for the hidden state, otherwise
             # we'd backprop through the entire training history
-            h = tuple([each.data for each in h])
-
+            #h = tuple([each.data for each in h]) # for lstm
+            h = h.data # for GRU
             # zero accumulated gradients
             net.zero_grad()
             
@@ -247,6 +458,7 @@ def train(net,data,seq_length,batch_size,epochs=10, lr=0.001,wieght_decay=0,clip
             # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
             nn.utils.clip_grad_norm_(net.parameters(), clip)
             opt.step()
+            train_losses.append(loss.item())
             
         # loss stats with validation 
         if (e+1) % print_every == 0:
@@ -263,7 +475,8 @@ def train(net,data,seq_length,batch_size,epochs=10, lr=0.001,wieght_decay=0,clip
 
                 # Creating new variables for the hidden state, otherwise
                 # we'd backprop through the entire training history
-                val_h = tuple([each.data for each in val_h])
+                # val_h = tuple([each.data for each in val_h]) # for lstm
+                val_h = val_h.data
                     
                 if(train_on_gpu):
                     val_inputs, val_targets = val_inputs.cuda(), val_targets.cuda()
@@ -284,9 +497,16 @@ def train(net,data,seq_length,batch_size,epochs=10, lr=0.001,wieght_decay=0,clip
                 val_loss = criterion(val_output, val_targets.view(batch_size*seq_length).long())
                 val_losses.append(val_loss.item())
             
-            print("> Epoch: {}/{}...".format(e+1, epochs),
-                    "Loss: {:.4f}...".format(loss.item()),
-                    "Val Loss: {:.4f}".format(np.mean(val_losses)) )
+            print(f"> Epoch: {e+1}/{epochs}...Train Loss: {np.mean(train_losses):.4f}... Val Loss: {np.mean(val_losses):.4f}")
+
+            all_epochs_train_lossess.append(np.mean(train_losses))
+            all_epochs_valid_lossess.append(np.mean(val_losses))
+            
+            if np.mean(val_losses) < 0.9 and np.mean(val_losses) > 0.75:
+                torch.save(net,f"model_{m_name}_val_loss_{np.mean(val_losses):.2f}.pth")
+            elif np.mean(val_losses) < 0.75:
+                torch.save(net,f"model_{m_name}_val_loss{np.mean(val_losses):.2f}.pth")     
+
             
             if (e+1)% report_every==0:
                 validationReport(net=net, predictions=valid_predictions, targets=valid_targets,ignore=net.char2int["NoName"] )
@@ -295,7 +515,9 @@ def train(net,data,seq_length,batch_size,epochs=10, lr=0.001,wieght_decay=0,clip
             net.train() # reset to train mode after iterationg through validation data
 
 
+    return all_epochs_train_lossess, all_epochs_valid_lossess
 
+#%%
 ## TODO: set your model hyperparameters
 
 torch.cuda.empty_cache()
@@ -303,18 +525,145 @@ torch.cuda.empty_cache()
 n_hidden=512
 n_layers=2
 n_epochs = 200 # start small if you are just testing initial behavior
-batch_size = 128
-embedding_dim = 256
+batch_size = 512
+embedding_dim = 512
 drop_prob = 0.2
-    #    batch_size x seq_length from arr.
+#    batch_size x seq_length from arr.
 
 data = {"train_inputs":np.array(train_inputs), "train_targets": np.array(train_targets), "valid_inputs":np.array(valid_inputs), "valid_targets":np.array(valid_targets)}
 
-net = AlarmRNN(tokens=vocab,int2vocab=int2vocab,vocab2int=vocab2int,embedding_dim=embedding_dim,n_hidden=n_hidden,n_layers=n_layers,drop_prob=drop_prob)
-print(net)
+# net1 = AlarmRNN1(tokens=vocab,int2vocab=int2vocab,vocab2int=vocab2int,embedding_dim=embedding_dim,n_hidden=n_hidden,n_layers=n_layers,drop_prob=drop_prob)
 
-# train the model
-train(net,data, seq_length=seq_length-1, batch_size=batch_size, epochs=n_epochs,lr=0.001, wieght_decay = 0.0002, print_every=1,report_every=20)
+# t1_loss, v1_loss = train("m_relu",net1,data, seq_length=seq_length-1, batch_size=batch_size, epochs=n_epochs,lr=0.001, wieght_decay = 0.0002, print_every=1,report_every=1)
+
+# t1_loss, v1_loss
+
+# %%
+
+n_layers =3
+# net2 = AlarmRNN1(tokens=vocab,int2vocab=int2vocab,vocab2int=vocab2int,embedding_dim=embedding_dim,n_hidden=n_hidden,n_layers=n_layers,drop_prob=drop_prob)
+# t2_loss, v2_loss=train("lstm_3",net2,data, seq_length=seq_length-1, batch_size=batch_size, epochs=n_epochs,lr=0.001, wieght_decay = 0.0002, print_every=1,report_every=10)
+
+# t2_loss, v2_loss
+#%%
+
+n_layers =3
+net3 = AlarmRNN3(tokens=vocab,int2vocab=int2vocab,vocab2int=vocab2int,embedding_dim=embedding_dim,n_hidden=n_hidden,n_layers=n_layers,drop_prob=drop_prob)
+t2_loss, v2_loss=train("GRU_3",net3,data, seq_length=seq_length-1, batch_size=batch_size, epochs=n_epochs,lr=0.001, wieght_decay = 0.0002, print_every=1,report_every=10)
+
+#%%
+
+# n_layers =3
+
+# model = torch.load("model_lstm_3_val_loss_0.80.pth")
+
+t3_loss, v3_loss=train("GRU_3",net3,data, seq_length=seq_length-1, batch_size=batch_size, epochs=n_epochs,lr=0.0001, wieght_decay = 0.0002, print_every=1,report_every=10)
+# t3_loss, v3_loss
+
+# %%
+
+# batch_size = 64
+# n_epochs = 400
+# model = torch.load("rnn2_fine_tuned_0.80_loss.pth")
+# #  model
+
+# train(model,data, seq_length=seq_length-1, batch_size=batch_size, epochs=n_epochs,lr=0.001/4, wieght_decay = 0.0007, print_every=1,report_every=40)
+# torch.save(model,"rnn2_fine_tuned_0.80_loss_2.pth")
+# losses_dict = {"train-loss": t2_loss, "valid-loss":v2_loss}
+
+
+# with open('gru.losses', 'wb') as f:
+#   pickle.dump(losses_dict , f)
+
+# print(">> lossses saved")
+
+# %%
+
+
+
+import pickle
+import plotly.graph_objects as go
+
+dict_loss = None
+with open('gru.losses', 'rb') as f: 
+    dict_loss = pickle.load(f)
+
+fig = go.Figure()
+x= list(range(len(dict_loss["train-loss"])))
+fig.add_trace(go.Scatter(x=x[:200], y=dict_loss["valid-loss"][:200], name="linear",line_shape='linear'))
+# fig.add_trace(go.Scatter(x=x, y= dict_loss["train-loss"], name="linear",line_shape='linear'))
+
+fig.update_layout(
+    # xaxis_tickfont_size=14,
+    yaxis=dict(
+        title='Validation Loss',
+        titlefont_size=16,
+        tickfont_size=14,
+    ),
+    xaxis=dict(
+        title = "Number of Epochs",
+        titlefont_size=16,
+        tickfont_size=14,
+    ),
+    xaxis_nticks=20,
+    # barmode='group',
+    height=400, 
+    width=800,
+    template='seaborn' # ggplot2
+    # bargap=0. # gap between bars of adjacent location coordinates.
+    # bargroupgap=0.1 # gap between bars of the same location coordinate.
+    )
+fig.show()
+
+# list(range(len(dict_loss["train-loss"])))
+
+# %% 
+
+"""
+    Evaluate the model
+"""
+
+model = torch.load("model_GRU_3_val_loss_0.85.pth")
+
+model.eval()
+
+# Get validation loss
+val_h = model.init_hidden(batch_size)
+val_losses = []
+model.eval()
+valid_predictions = None  #torch.empty()
+valid_targets =  None #torch.empty()
+for x, y in get_batches(data["valid_inputs"],data["valid_targets"],batch_size, seq_length):
+    
+    x, y = torch.from_numpy(x), torch.from_numpy(y)
+    val_inputs, val_targets = x, y
+
+    # Creating new variables for the hidden state, otherwise
+    # we'd backprop through the entire training history
+    # val_h = tuple([each.data for each in val_h]) # for lstm
+    val_h = val_h.data
+        
+    if(train_on_gpu):
+        val_inputs, val_targets = val_inputs.cuda(), val_targets.cuda()
+
+    val_output, val_h = model(val_inputs, val_h)
+
+    _, predictions = torch.max(val_output,dim=1) # probs are the indexes
+    predictions = predictions.to("cpu")
+    targets = val_targets.view(batch_size*seq_length).long().to('cpu')
+    if valid_predictions is not None:
+        valid_predictions = torch.cat((valid_predictions,predictions))
+        valid_targets = torch.cat((valid_targets,targets))
+    else:
+        valid_predictions = predictions
+        valid_targets = targets
+
+
+    # val_loss = criterion(val_output, val_targets.view(batch_size*seq_length).long())
+    # val_losses.append(val_loss.item())
+
+    # print(f"> Val Loss: {np.mean(val_losses):.4f}")
+validationReport(net=model, predictions=valid_predictions, targets=valid_targets,ignore=model.char2int["NoName"] )
 
 
 # %%

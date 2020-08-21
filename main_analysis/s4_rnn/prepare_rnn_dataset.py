@@ -6,6 +6,7 @@ import numpy as np
 from functools import partial
 from sklearn.model_selection import train_test_split
 import itertools
+import pickle
 
 # %%
 
@@ -153,36 +154,36 @@ def getTrainAndValidationData(df,seq_time_gap,seq_ignore_len,test_size,shuffle=F
 
     return train_data, valid_data, max_seq_len  
 
-def encodeData(mydict,l):
-    return [mydict[e] for e in l]
+# def encodeData(mydict,l):
+#     return [mydict[e] for e in l]
 
-def getInputsAndTargets(encoded_alarms):
-    input_seqs_train = []
-    target_seqs_train = []
+# def getInputsAndTargets(encoded_alarms):
+#     input_seqs_train = []
+#     target_seqs_train = []
 
-    for i in range(len(encoded_alarms)):
-        # remove the last char from input seq
-        input_seqs_train.append(encoded_alarms[i][:-1])
+#     for i in range(len(encoded_alarms)):
+#         # remove the last char from input seq
+#         input_seqs_train.append(encoded_alarms[i][:-1])
 
-        # remove the first char from input seq
-        target_seqs_train.append(encoded_alarms[i][1:])
-        # print(f"orignal={encoded_alarms[i]} \n Input Seq={input_seqs_train[i]}, \n Target Seq = {target_seqs_train[i]}")
+#         # remove the first char from input seq
+#         target_seqs_train.append(encoded_alarms[i][1:])
+#         # print(f"orignal={encoded_alarms[i]} \n Input Seq={input_seqs_train[i]}, \n Target Seq = {target_seqs_train[i]}")
 
-    inputs = []
-    targets = []
-    for l in input_seqs_train:
-        inputs = inputs+l
+#     inputs = []
+#     targets = []
+#     for l in input_seqs_train:
+#         inputs = inputs+l
 
-    for l in target_seqs_train:
-        targets = targets + l
+#     for l in target_seqs_train:
+#         targets = targets + l
 
 
-    # for row in range(len(input_seqs_train)): 
-    row = 0
+#     # for row in range(len(input_seqs_train)): 
+#     row = 0
 
-    # print(inputs[row*(seq_length-1):row*(seq_length-1)+ seq_length-1],targets[row*(seq_length-1):row*(seq_length-1)+ seq_length-1])
-    print(input_seqs_train[row], target_seqs_train[row])
-    return inputs, targets, input_seqs_train, target_seqs_train
+#     # print(inputs[row*(seq_length-1):row*(seq_length-1)+ seq_length-1],targets[row*(seq_length-1):row*(seq_length-1)+ seq_length-1])
+#     print(input_seqs_train[row], target_seqs_train[row])
+#     return inputs, targets, input_seqs_train, target_seqs_train
 
 
 
@@ -198,24 +199,26 @@ duration_from_1_seq_to_next = 60*15 # duration in seconds
 test_size = 0.1
 shuffle = False
 
-# print("    ===== Without Ignoring Short Seq==========") 
-# train_data, valid_data = getTrainAndValidationData(df_rnn,seq_time_gap=duration_from_1_seq_to_next,seq_ignore_len=1,test_size=test_size,shuffle=shuffle)
-
-# print(f">> Train Size: {len(train_data)}, Validation Size: {len(valid_data)}")  
-
-
-print("===== Ignoring Short Seq==========") 
-train_data,valid_data, max_seq_len = getTrainAndValidationData(df_rnn,seq_time_gap=duration_from_1_seq_to_next,seq_ignore_len=ingore_short_seq_len,test_size=test_size,shuffle=shuffle)
-
+train_data, valid_data, max_seq_len = getTrainAndValidationData(df_rnn,seq_time_gap=duration_from_1_seq_to_next,seq_ignore_len=ingore_short_seq_len,test_size=test_size,shuffle=shuffle)
 seq_length = max_seq_len
 
 print(f">> Train Size: {len(train_data)}, Validation Size: {len(valid_data)}")  
 print(valid_data[1])
 
-# %% [markdown]
-# ## Preparing Vocab and conversion from vocab2int and into2vocab
 
-# %%
+#%%
+
+store_dict = {"seq-duration":duration_from_1_seq_to_next, "train": train_data, "valid":valid_data, "sequence-length":seq_length}
+
+with open('raw-dataset-15-mins.dataset', 'wb') as f:
+  pickle.dump(store_dict , f)
+
+print(">> Dataset is stored")
+
+# %% [markdown]
+# # ## Preparing Vocab and conversion from vocab2int and into2vocab
+
+# # %%
 
 vocab = set(list(itertools.chain.from_iterable(train_data+valid_data)))
 int2vocab = dict(enumerate(vocab))
