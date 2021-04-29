@@ -7,6 +7,39 @@ from functools import partial
 from sklearn.model_selection import train_test_split
 import itertools
 import pickle
+#%%
+
+def encodeData(mydict,l):
+    return [mydict[e] for e in l]
+
+def getInputsAndTargets(encoded_alarms):
+    input_seqs_train = []
+    target_seqs_train = []
+
+    for i in range(len(encoded_alarms)):
+        # remove the last char from input seq
+        input_seqs_train.append(encoded_alarms[i][:-1])
+
+        # remove the first char from input seq
+        target_seqs_train.append(encoded_alarms[i][1:])
+        # print(f"orignal={encoded_alarms[i]} \n Input Seq={input_seqs_train[i]}, \n Target Seq = {target_seqs_train[i]}")
+
+    inputs = []
+    targets = []
+    for l in input_seqs_train:
+        inputs = inputs+l
+
+    for l in target_seqs_train:
+        targets = targets + l
+
+
+    # for row in range(len(input_seqs_train)): 
+    # row = 0
+
+    # print(inputs[row*(seq_length-1):row*(seq_length-1)+ seq_length-1],targets[row*(seq_length-1):row*(seq_length-1)+ seq_length-1])
+    # print(input_seqs_train[row], target_seqs_train[row])
+    return inputs, targets, input_seqs_train, target_seqs_train
+
 
 # %%
 
@@ -40,9 +73,9 @@ print("Total Time to load the data ", time.time()-start)
     6. DO SKIP ANY SOURCENAME IF IGNORING COMMUNICATION ALARMS
 """
 ignore_comm_alarms = True
-momentary_alarms_f = 0  # seconds
+momentary_alarms_f = 5 # seconds
 staling_alarm_f = (60*60) * 12 # hours
-min_alarms_per_source_f = 200 # any source which is not triggered atleast 20 times in whole dataset will be removed
+min_alarms_per_source_f = 1500 # any source which is not triggered atleast 20 times in whole dataset will be removed
 months_f = df_main_alarms["Year-Month"].unique()
 snames_f = [] # ONLY USE IF NOT IGNORING COMM ALRMS
 
@@ -64,20 +97,17 @@ print(len(source2count))
 print(source2count)
 
 # %%
-def getSequenceByMonth(df,month,seq_duration_gap,filter_short_seq):
-    print(f">> Seq By Month:{month}, duration to next seq: {seq_duration_gap}, ignore seq len: {filter_short_seq}")
 
-    list_of_sequences = []
-    # max_len = 0
-    # min_len = 9999   
-    df_month = df[df["Year-Month"]==month]
-    assert 1 == len(df_month["Year-Month"].unique())
-    
-    alarms= df_month.to_dict(orient="records")
+def getSequenceOfWholeData(df,seq_duration_gap,filter_short_seq):
+    print(f">> Duration to next seq: {seq_duration_gap}, ignore seq len: {filter_short_seq}")
+
+    list_of_sequences = []    
+    alarms= df.to_dict(orient="records")
     alarms = [alarm for alarm in sorted(alarms, key=lambda arg: arg["StartTime"], reverse=False)] # sorting
-    # print(alarms[:2])
     i =0
     j= 0
+
+    max_seq_len = -1
     while i <len(alarms):
         prev_start = alarms[i]["StartTime"]
         seq = []
@@ -94,20 +124,18 @@ def getSequenceByMonth(df,month,seq_duration_gap,filter_short_seq):
             seq.append(alarms[j])
             j += 1
         i = j
-        # if len(seq)>max_len:
-        #     max_len = len(seq)
-        # if len(seq)<min_len:
-        #     min_len = len(seq)
-        
 
+        if len(seq) > max_seq_len:
+            max_seq_len = len(seq)
+        
         if len(seq)>=filter_short_seq:
             seq = [alarm for alarm in sorted(seq, key=lambda arg: arg["StartTime"], reverse=False)]
             seq = [alarm["SourceName"] for alarm in seq]
             list_of_sequences.append(seq)
     
-    # list_of_sequences = [l for l in list_of_sequences if (len(l)>filter_short_alarms)]
-    # print(f">> Min Seq Len: {min_len}, max seq len: {max_len}")
-    return list_of_sequences
+    
+    return list_of_sequences, max_seq_len
+
 
 
 #Doing Padding
@@ -115,75 +143,26 @@ def padding(seq_length,arr):
     
     if len(arr) < seq_length:
         return ["NoName" for i in range(seq_length-len(arr))] + arr
-    # elif len(arr) > seq_length: # if bigger than seq_length use earliers
-    #     return arr[0:seq_length]
-
+   
     return arr
-
-def getAllMonths2Seqs(df,seq_time_gap,seq_ignore_len):
-    # print(f">> All Months: Seq_len = {seq_length}")
-    month2alarms = {}
-
-    all_seqs = [] 
-
-    for month in df["Year-Month"].unique():
-        li_of_seqs = getSequenceByMonth(df,month,seq_time_gap,seq_ignore_len)
-        all_seqs = all_seqs + li_of_seqs
-        # seq_length = max([len(seq) for seq in li_of_seqs]) 
-        # f = partial(padding,seq_length)
-        month2alarms[month] =  all_seqs #[f for l in li_of_seqs]
-    
-    max_seq_len = max([len(seq) for seq in all_seqs])
-    f = partial(padding,max_seq_len)
-
-    month2alarms = {k:[f(l) for l in v] for k,v in month2alarms.items()}
-
-    return month2alarms, max_seq_len
 
 
 def getTrainAndValidationData(df,seq_time_gap,seq_ignore_len,test_size,shuffle=False):
     print(f">> Spliting Data Size (valid%): {test_size}")
     train_data = []
     valid_data = []
-    months2seq, max_seq_len = getAllMonths2Seqs(df,seq_time_gap=seq_time_gap,seq_ignore_len=seq_ignore_len)
+    # getSequenceOfWholeData(df,seq_duration_gap,filter_short_seq):
+    li_of_seqs ,max_seq_len = getSequenceOfWholeData(df,seq_duration_gap=seq_time_gap,filter_short_seq= seq_ignore_len)
 
-    for month in df["Year-Month"].unique():
-      train,valid = train_test_split(months2seq[month],test_size=test_size,shuffle=shuffle)
-      train_data += train
-      valid_data += valid
+    f = partial(padding,max_seq_len)
 
+    li_of_seqs = [f(l) for l in li_of_seqs]
+
+    train_data,valid_data = train_test_split(li_of_seqs,test_size=test_size,shuffle=shuffle)
+
+    
     return train_data, valid_data, max_seq_len  
 
-# def encodeData(mydict,l):
-#     return [mydict[e] for e in l]
-
-# def getInputsAndTargets(encoded_alarms):
-#     input_seqs_train = []
-#     target_seqs_train = []
-
-#     for i in range(len(encoded_alarms)):
-#         # remove the last char from input seq
-#         input_seqs_train.append(encoded_alarms[i][:-1])
-
-#         # remove the first char from input seq
-#         target_seqs_train.append(encoded_alarms[i][1:])
-#         # print(f"orignal={encoded_alarms[i]} \n Input Seq={input_seqs_train[i]}, \n Target Seq = {target_seqs_train[i]}")
-
-#     inputs = []
-#     targets = []
-#     for l in input_seqs_train:
-#         inputs = inputs+l
-
-#     for l in target_seqs_train:
-#         targets = targets + l
-
-
-#     # for row in range(len(input_seqs_train)): 
-#     row = 0
-
-#     # print(inputs[row*(seq_length-1):row*(seq_length-1)+ seq_length-1],targets[row*(seq_length-1):row*(seq_length-1)+ seq_length-1])
-#     print(input_seqs_train[row], target_seqs_train[row])
-#     return inputs, targets, input_seqs_train, target_seqs_train
 
 
 
@@ -196,13 +175,13 @@ def getTrainAndValidationData(df,seq_time_gap,seq_ignore_len,test_size,shuffle=F
 ingore_short_seq_len = 3 
 # long_len = seq_length 
 duration_from_1_seq_to_next = 60*15 # duration in seconds
-test_size = 0.1
+test_size = 0.15
 shuffle = False
 
 train_data, valid_data, max_seq_len = getTrainAndValidationData(df_rnn,seq_time_gap=duration_from_1_seq_to_next,seq_ignore_len=ingore_short_seq_len,test_size=test_size,shuffle=shuffle)
 seq_length = max_seq_len
 
-print(f">> Train Size: {len(train_data)}, Validation Size: {len(valid_data)}")  
+print(f">> Train Size: {len(train_data)}, Validation Size: {len(valid_data)}, Sequence Lenght: {seq_length}")  
 print(valid_data[1])
 
 
@@ -210,7 +189,7 @@ print(valid_data[1])
 
 store_dict = {"seq-duration":duration_from_1_seq_to_next, "train": train_data, "valid":valid_data, "sequence-length":seq_length}
 
-with open('raw-dataset-15-mins.dataset', 'wb') as f:
+with open('raw-dataset-15-mins_prof.dataset', 'wb') as f:
   pickle.dump(store_dict , f)
 
 print(">> Dataset is stored")
@@ -238,12 +217,15 @@ train_features.shape
 
 # %%
 
-row = 0 # this row should always be zero because in function it is zero
+row = 1 # this row should always be zero because in function it is zero
 
 print(">> ============ Training Set ==============")
 train_inputs, train_targets, _, _ = getInputsAndTargets(encoded_train_alarms)
-print(train_inputs[row*(seq_length-1):row*(seq_length-1)+ seq_length-1],train_targets[row*(seq_length-1):row*(seq_length-1)+ seq_length-1])
+print(train_inputs[row*(seq_length-1):row*(seq_length-1)+ seq_length-1])
+print("hello")
+print(train_targets[row*(seq_length-1):row*(seq_length-1)+ seq_length-1])
 
+#%%
 print(">> =========== Validation Set ==============")
 valid_inputs, valid_targets, _, _ = getInputsAndTargets(encoded_valid_alarms)    
 print(valid_inputs[row*(seq_length-1):row*(seq_length-1)+ seq_length-1],valid_targets[row*(seq_length-1):row*(seq_length-1)+ seq_length-1])
@@ -268,7 +250,7 @@ store_dataset = {
 "valid_targets": valid_targets
 }
 
-with open('seq.dataset', 'wb') as f:
+with open('seq_prof_suggestion.dataset', 'wb') as f:
   pickle.dump(store_dataset , f)
 
 print(">> Dataset is stored")

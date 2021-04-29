@@ -1,5 +1,8 @@
 
 # %%
+import sys
+sys.path.append('../helpers')
+
 from typing import Final
 from helpers.ploting import plotBargraph, plotSubBarGraphs
 from helpers.graphs import filterEdges
@@ -28,6 +31,9 @@ df_main_actions = loadOperatorData(file_path=op_action_file_path)
 print("Total Time to load the data ", time.time()-start)
 df_main_alarms
 df_main_alarms.info()
+
+
+print(f"Total Alarms: {df_main_alarms.shape}, Total Operator Action: {df_main_actions.shape}, Total Sources: {len(df_main_alarms['SourceName'].unique())} ")
 
 # %%
 

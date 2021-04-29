@@ -1,6 +1,6 @@
 # %%
 from helpers.group_alarms import analyzeAlarmdata
-from helpers.ploting import plotBargraph, plotSourceAndCondtionHistogram
+from helpers.ploting import plotAlarmsRelationsHeatMap, plotBargraph, plotSourceAndCondtionHistogram, plotAlarmsRelationsHeatMap
 from helpers.alarms import filterAlarmData, loadAlarmsData, loadOperatorData
 from helpers import operator_actions as operator
 import time
@@ -86,6 +86,9 @@ def groupNuisanceSourceNamesInDF(df, max_edge_drop_factor=1.3, num_sub_graphs=4,
             print(
                 f">> ==========Level=1 Iteration of Merging Components = {iteration} =============")
             g, components, node2common_name = analyzeAlarmdata(df, num_sub_graphs=num_sub_graphs, min_intersection_f=min_intersection_f, next_start_gap=next_start_gap,  next_end_gap=next_end_gap, edge_drop_factor=edge_drop_factor)
+            
+            if iteration <= 3:
+                plotAlarmsRelationsHeatMap(g)
 
             df["SourceName"] = df["SourceName"].apply(lambda name: node2common_name[name] if name in node2common_name.keys() else name)
             # print(components)
@@ -99,7 +102,11 @@ def groupNuisanceSourceNamesInDF(df, max_edge_drop_factor=1.3, num_sub_graphs=4,
 
 
 
-groupNuisanceSourceNamesInDF(df_alarms_nuisance_temp) # grouped sources as 1 
+#%%
+
+groupNuisanceSourceNamesInDF(df_alarms_nuisance_temp) # grouping of parent-child relationships 
+
+#%%
 plotSourceAndCondtionHistogram(df_alarms_nuisance_temp) # to visualize which sourcenames are grouped
 #%%
 print(f"\n\n>> Number of Grouped Nuisance Alarms: {len(df_alarms_nuisance_temp['SourceName'].unique())}, Source = {df_alarms_nuisance_temp['SourceName'].unique()}" )
