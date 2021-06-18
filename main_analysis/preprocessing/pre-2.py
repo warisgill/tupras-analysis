@@ -126,8 +126,8 @@ def _convertRecordsToAlarmsOld(records):
 # %%
 
 cols = ["MachineName","SourceName","EventTime", "Message","MessageType","Condition"]
-PATH = "/home/waris/Github/tupras-analysis/data/"
-path = PATH + "/processed/alarms/"
+PATH = "../../data"
+path = PATH + "/processed/alarms_with_feed/"
 
 # %%
 for p in glob.glob(path+"*.csv"):  

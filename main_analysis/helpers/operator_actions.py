@@ -4,6 +4,24 @@ from functools import partial
 from multiprocessing import Pool
 
 
+def printGraph(g):
+    main_g = g
+    operator_nodes = [action for action in g.nodes if action.find("Operator") != -1]
+    for op in operator_nodes:
+        action_count = main_g.nodes[op]['count']
+        num_neg = len(list(main_g.neighbors(op)))
+        print(f"{op} Count:{action_count}|| Correspodning Alarms = {num_neg} ", end = " " )
+        # s = ""
+        for n in main_g.neighbors(op):
+            alarm_count = main_g.nodes[n]['count']
+            edge_weight = main_g.edges[(op,n)]['weight']
+            action_alarms_ratio = alarm_count/action_count
+
+
+            print(f"{n}(count:{alarm_count})(weight:{edge_weight}), (ratio: {action_alarms_ratio})", end = ", ")
+    
+    print("\n -----------------------------------------------")
+
 
 def __addOrUpdateEdge(g, e):
     if g.has_edge(*e) == True:
@@ -32,6 +50,8 @@ def __checkAction_OnAlarm(action, alarm):
         return True
     else:
         return False
+
+    # if action["EventTime"] > alarm["StartTime"] and action["EventTime"] <= min(30*60, alarm["EndTime"]- alarm["StartTime"]) :
 
 
 def __constructSingleAlarmsActionsGraph(args):  # case 3
@@ -66,6 +86,9 @@ def __constructSingleAlarmsActionsGraph(args):  # case 3
 
     print(">> # of nodes = {}, # of edges = {}".format(
         g.number_of_nodes(), g.number_of_edges()))
+
+    # printGraph(g)
+
     return g
 
 
@@ -92,9 +115,9 @@ def __constructMultipleAlarmsActionsGraphs(df_alarms, df_actions, chunks):
 
         min_date = df1["StartTime"].min()
         max_date = df1["StartTime"].max()
-        print(
-            f">> Index Range = {t}, Min Date ={min_date.date()} & Max date = {max_date.date()}")
-        print(">> Filtering the Operator actions based on min-max dates ...")
+        # print(
+        #     f">> Index Range = {t}, Min Date ={min_date.date()} & Max date = {max_date.date()}")
+        # print(">> Filtering the Operator actions based on min-max dates ...")
 
         df2 = df_actions.loc[(df_actions["EventTime"] >= min_date)
                          & (df_actions["EventTime"] <= max_date)]
@@ -102,11 +125,17 @@ def __constructMultipleAlarmsActionsGraphs(df_alarms, df_actions, chunks):
 
         temp_dfs.append((df1,df2))
 
-        # g = __constructSingleAlarmsActionsGraph(df1, df2)
-        # graphs.append(g)
+        g = __constructSingleAlarmsActionsGraph((df1, df2))
+        graphs.append(g)
     
-    with Pool(6) as p:
-        graphs = p.map(__constructSingleAlarmsActionsGraph,temp_dfs)
+    
+    # graphs = []
+
+    # for temp_df in temp_dfs:
+    #     graphs.append(__constructMultipleAlarmsActionsGraphs())
+    
+    # with Pool(5) as p:
+    #     graphs = p.map(__constructSingleAlarmsActionsGraph,temp_dfs)
 
 
 
